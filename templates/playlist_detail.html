@@ -1,0 +1,455 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ playlist.name }} - Hotpot Music{% endblock %}
+
+{% block content %}
+<div class="playlist-detail-container">
+    <div class="playlist-header">
+        <div class="playlist-cover">
+            {% if playlist.cover_image %}
+            <img src="{{ playlist.cover_image }}" alt="{{ playlist.name }} 커버 이미지">
+            {% else %}
+            <div class="playlist-cover-placeholder">
+                <span>{{ playlist.name[0] }}</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="playlist-info">
+            <h1>{{ playlist.name }}</h1>
+            <p class="playlist-creator">만든이: {{ playlist.user.username }}</p>
+            {% if playlist.description %}
+            <p class="playlist-description">{{ playlist.description }}</p>
+            {% endif %}
+            <p class="playlist-stats">
+                <span>곡 {{ playlist.songs|length }}개</span>
+                <span>{{ playlist.created_at.strftime('%Y년 %m월 %d일') }} 생성</span>
+            </p>
+            
+            <div class="playlist-action-buttons">
+                {% if playlist.songs|length > 0 %}
+                <button class="btn btn-primary play-playlist-btn" onclick="playFirstSong()">
+                    <i class="fas fa-play"></i> 플레이리스트 재생
+                </button>
+                {% endif %}
+            </div>
+            
+            {% if current_user.is_authenticated and playlist.user_id == current_user.id %}
+            <div class="playlist-actions">
+                <a href="{{ url_for('edit_playlist', playlist_id=playlist.id) }}" class="btn">플레이리스트 수정</a>
+                <a href="{{ url_for('search_songs', playlist_id=playlist.id) }}" class="btn">노래 추가</a>
+                <button onclick="confirmDeletePlaylist({{ playlist.id }})" class="btn btn-danger">삭제</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="playlist-songs">
+        <h2>수록곡 목록</h2>
+        {% if playlist.songs %}
+        <ul class="song-list">
+            {% for playlist_song in playlist.songs %}
+            <li class="song-item">
+                <div class="song-info">
+                    <span class="song-number">{{ loop.index }}</span>
+                    <div class="song-details">
+                        <h3>{{ playlist_song.song.title }}</h3>
+                        <span class="song-album">앨범: <a href="{{ url_for('album_detail', album_id=playlist_song.song.album_id) }}">{{ playlist_song.song.album.title }}</a></span>
+                        <span class="song-artist">아티스트: {{ playlist_song.song.album.artist }}</span>
+                        {% if playlist_song.song.duration %}
+                        <span class="duration">{{ playlist_song.song.duration }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="song-actions">
+                    {% if playlist_song.song.youtube_url %}
+                    <button class="btn-play" title="재생하기" onclick="playSong('{{ playlist_song.song.youtube_embed_url|safe }}', '{{ playlist_song.song.title|safe }}')">
+                        <i class="fas fa-play"></i> 재생
+                    </button>
+                    {% endif %}
+                    
+                    {% if current_user.is_authenticated and playlist.user_id == current_user.id %}
+                    <a href="{{ url_for('remove_from_playlist', playlist_id=playlist.id, song_id=playlist_song.song_id) }}" class="btn-remove" title="플레이리스트에서 제거">
+                        <i class="fas fa-times"></i> 제거
+                    </a>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="no-songs">아직 노래가 없습니다. 노래를 추가해보세요!</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 노래 재생 모달 -->
+<div id="player-modal" class="modal">
+    <div class="modal-content player-modal-content">
+        <span class="close-modal">&times;</span>
+        <h2 id="player-song-title"></h2>
+        <div class="youtube-player-container">
+            <iframe id="youtube-player" width="560" height="315" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+<style>
+    .playlist-detail-container {
+        max-width: 900px;
+        margin: 30px auto;
+        padding: 0 15px;
+    }
+    
+    .playlist-header {
+        display: flex;
+        gap: 30px;
+        margin-bottom: 40px;
+    }
+    
+    .playlist-cover {
+        width: 220px;
+        height: 220px;
+        flex-shrink: 0;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .playlist-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .playlist-cover-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--hotpot-red), var(--hotpot-accent));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 4rem;
+        font-weight: bold;
+        color: white;
+    }
+    
+    .playlist-info {
+        flex: 1;
+    }
+    
+    .playlist-info h1 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 2.2rem;
+        color: var(--hotpot-darkest);
+    }
+    
+    .playlist-creator {
+        color: var(--hotpot-dark);
+        margin-bottom: 12px;
+    }
+    
+    .playlist-description {
+        margin-bottom: 15px;
+        white-space: pre-line;
+        color: var(--hotpot-dark);
+    }
+    
+    .playlist-stats {
+        display: flex;
+        gap: 20px;
+        color: var(--hotpot-medium);
+        font-size: 0.9rem;
+        margin-bottom: 20px;
+    }
+    
+    .playlist-action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .playlist-songs h2 {
+        margin-bottom: 20px;
+        color: var(--hotpot-darkest);
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    
+    .song-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .song-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        background-color: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s;
+    }
+    
+    .song-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .song-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex: 1;
+    }
+    
+    .song-number {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--hotpot-light);
+        color: var(--hotpot-darkest);
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+    
+    .song-details {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .song-details h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: var(--hotpot-darkest);
+    }
+    
+    .song-album, .song-artist {
+        font-size: 0.9rem;
+        color: var(--hotpot-dark);
+    }
+    
+    .song-album a {
+        color: var(--hotpot-dark);
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.2s;
+    }
+    
+    .song-album a:hover {
+        border-color: var(--hotpot-red);
+    }
+    
+    .duration {
+        font-size: 0.9rem;
+        color: var(--hotpot-medium);
+    }
+    
+    .song-actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn-play, .btn-remove {
+        background-color: transparent;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.2s;
+    }
+    
+    .btn-play {
+        background-color: var(--hotpot-light);
+        color: var(--hotpot-darkest);
+    }
+    
+    .btn-play:hover {
+        background-color: var(--hotpot-light-hover);
+    }
+    
+    .btn-remove {
+        color: var(--hotpot-red);
+    }
+    
+    .btn-remove:hover {
+        background-color: rgba(230, 57, 70, 0.1);
+    }
+    
+    .remove-song-form {
+        margin: 0;
+    }
+    
+    .no-songs {
+        text-align: center;
+        padding: 30px;
+        background-color: white;
+        border-radius: 8px;
+        color: var(--hotpot-medium);
+    }
+    
+    /* 모달 스타일 */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.7);
+    }
+    
+    .modal-content {
+        position: relative;
+        background-color: #fff;
+        margin: 10% auto;
+        padding: 20px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 600px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        animation: modal-fade-in 0.3s;
+    }
+    
+    .close-modal {
+        position: absolute;
+        right: 20px;
+        top: 15px;
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close-modal:hover {
+        color: var(--hotpot-dark);
+    }
+    
+    .youtube-player-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 56.25%; /* 16:9 비율 */
+        height: 0;
+        overflow: hidden;
+        margin-top: 20px;
+    }
+    
+    .youtube-player-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 4px;
+    }
+    
+    @keyframes modal-fade-in {
+        from {opacity: 0; transform: translateY(-20px);}
+        to {opacity: 1; transform: translateY(0);}
+    }
+    
+    @media (max-width: 767px) {
+        .playlist-header {
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .playlist-cover {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+        }
+    }
+    
+    /* 버튼 스타일 */
+    .btn-primary {
+        background-color: var(--hotpot-red);
+        color: white;
+        border: none;
+        transition: all 0.2s;
+    }
+    
+    .btn-primary:hover {
+        background-color: var(--hotpot-orange);
+    }
+    
+    .play-playlist-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .playlist-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const playerModal = document.getElementById('player-modal');
+        const youtubePlayer = document.getElementById('youtube-player');
+        const playerSongTitle = document.getElementById('player-song-title');
+        
+        // 닫기 버튼에 이벤트 리스너 추가
+        document.querySelector('.close-modal').addEventListener('click', function() {
+            playerModal.style.display = 'none';
+            youtubePlayer.src = '';  // 플레이어 중지
+        });
+        
+        // 모달 바깥 클릭시 닫힘
+        window.addEventListener('click', function(event) {
+            if (event.target === playerModal) {
+                playerModal.style.display = 'none';
+                youtubePlayer.src = '';  // 플레이어 중지
+            }
+        });
+    });
+    
+    // 노래 재생 기능
+    function playSong(embedUrl, songTitle) {
+        const playerSongTitle = document.getElementById('player-song-title');
+        const youtubePlayer = document.getElementById('youtube-player');
+        const playerModal = document.getElementById('player-modal');
+        
+        playerSongTitle.textContent = songTitle;
+        youtubePlayer.src = embedUrl + '?autoplay=1';
+        playerModal.style.display = 'block';
+    }
+    
+    // 플레이리스트 삭제 확인
+    function confirmDeletePlaylist(playlistId) {
+        if (confirm('정말로 이 플레이리스트를 삭제하시겠습니까?')) {
+            window.location.href = `/delete_playlist/${playlistId}`;
+        }
+    }
+
+    // 플레이리스트의 첫 번째 곡 재생
+    function playFirstSong() {
+        {% if playlist.songs|length > 0 %}
+        const firstSong = {{ playlist.songs[0].song.youtube_embed_url|tojson }};
+        const firstSongTitle = {{ playlist.songs[0].song.title|tojson }};
+        
+        if(firstSong) {
+            playSong(firstSong, firstSongTitle);
+        } else {
+            alert('첫 번째 곡에 재생 가능한 유튜브 링크가 없습니다.');
+        }
+        {% endif %}
+    }
+</script>
+{% endblock %} 

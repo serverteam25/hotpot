@@ -1,0 +1,215 @@
+:root {
+    --hotpot-red: #e63946;
+    --hotpot-dark-red: #d62828;
+    --hotpot-orange: #f4a261;
+    --hotpot-light: #f1faee;
+    --hotpot-medium: #a8dadc;
+    --hotpot-dark: #457b9d;
+    --hotpot-darkest: #1d3557;
+}
+
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--hotpot-light);
+    color: var(--hotpot-darkest);
+}
+
+header {
+    background-color: var(--hotpot-red);
+    padding: 0.5rem 2rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo a {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links li {
+    margin-left: 1.5rem;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 0.8rem;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.nav-links a:hover {
+    background-color: var(--hotpot-dark-red);
+}
+
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.flash-messages {
+    margin-bottom: 2rem;
+}
+
+.flash-message {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    transition: opacity 0.5s;
+}
+
+.flash-message.success {
+    background-color: #d4edda;
+    border-left: 4px solid #28a745;
+    color: #155724;
+}
+
+.flash-message.error {
+    background-color: #f8d7da;
+    border-left: 4px solid #dc3545;
+    color: #721c24;
+}
+
+.flash-message.warning {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    color: #856404;
+}
+
+.flash-message.info {
+    background-color: #d1ecf1;
+    border-left: 4px solid #17a2b8;
+    color: #0c5460;
+}
+
+footer {
+    background-color: var(--hotpot-darkest);
+    color: white;
+    text-align: center;
+    padding: 1.5rem;
+    margin-top: 3rem;
+}
+
+.btn {
+    display: inline-block;
+    background-color: var(--hotpot-red);
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background-color: var(--hotpot-dark-red);
+    transform: translateY(-2px);
+}
+
+.btn-outline {
+    background-color: transparent;
+    border: 2px solid var(--hotpot-red);
+    color: var(--hotpot-red);
+}
+
+.btn-outline:hover {
+    background-color: rgba(230, 57, 70, 0.1);
+}
+
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* 로그인 & 회원가입 폼 스타일 */
+.auth-form {
+    max-width: 400px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.auth-form h1 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: var(--hotpot-darkest);
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 1.2rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--hotpot-red);
+    box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
+}
+
+.form-actions {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.form-actions .btn {
+    width: 100%;
+}
+
+.auth-links {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.auth-links a {
+    color: var(--hotpot-dark);
+    text-decoration: none;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+} 

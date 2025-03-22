@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ album.title }}에 노래 추가 - Hotpot Music{% endblock %}
+
+{% block content %}
+<section class="form-section">
+    <h1>"{{ album.title }}"에 노래 추가</h1>
+    <p class="subtitle">아티스트: {{ album.artist }}</p>
+    
+    <form action="{{ url_for('add_song', album_id=album.id) }}" method="POST" class="form">
+        <div class="form-group">
+            <label for="title">노래 제목 *</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="track_number">트랙 번호</label>
+            <input type="number" id="track_number" name="track_number" min="1">
+        </div>
+        
+        <div class="form-group">
+            <label for="duration">재생 시간 (예: 3:45)</label>
+            <input type="text" id="duration" name="duration" placeholder="0:00">
+        </div>
+        
+        <div class="form-group">
+            <label for="youtube_url">유튜브 링크 (노래 재생에 사용됩니다)</label>
+            <input type="url" id="youtube_url" name="youtube_url" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+            <small class="form-text">예: https://www.youtube.com/watch?v=dQw4w9WgXcQ 또는 https://youtu.be/dQw4w9WgXcQ</small>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn">노래 추가</button>
+            <a href="{{ url_for('album_detail', album_id=album.id) }}" class="btn btn-outline">취소</a>
+        </div>
+    </form>
+</section>
+
+<style>
+    .form-section {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section h1 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        color: var(--hotpot-darkest);
+    }
+    
+    .subtitle {
+        color: var(--hotpot-dark);
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.2rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group input[type="url"],
+    .form-group textarea {
+        width: 100%;
+        padding: 0.7rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--hotpot-red);
+        box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
+    }
+    
+    .form-text {
+        display: block;
+        margin-top: 0.25rem;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .form-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border: 2px solid var(--hotpot-red);
+        color: var(--hotpot-red);
+    }
+    
+    .btn-outline:hover {
+        background-color: rgba(230, 57, 70, 0.1);
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 재생 시간 입력 형식 검사
+        const durationInput = document.getElementById('duration');
+        
+        durationInput.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value && !value.match(/^\d+:\d{2}$/)) {
+                alert('재생 시간을 올바른 형식으로 입력해주세요 (예: 3:45)');
+                this.focus();
+            }
+        });
+        
+        // 유튜브 URL 형식 검사
+        const youtubeInput = document.getElementById('youtube_url');
+        
+        youtubeInput.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value && !value.includes('youtube.com/watch?v=') && !value.includes('youtu.be/')) {
+                alert('올바른 유튜브 URL을 입력해주세요 (예: https://www.youtube.com/watch?v=VIDEO_ID 또는 https://youtu.be/VIDEO_ID)');
+            }
+        });
+    });
+</script>
+{% endblock %} 

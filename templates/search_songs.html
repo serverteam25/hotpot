@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% block title %}플레이리스트에 노래 추가 - Hotpot Music{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <div class="search-header">
+        <h1>"{{ playlist.name }}" 플레이리스트에 노래 추가</h1>
+        <a href="{{ url_for('playlist_detail', playlist_id=playlist.id) }}" class="btn btn-outline">돌아가기</a>
+    </div>
+    
+    <div class="search-form-container">
+        <form action="{{ url_for('search_songs', playlist_id=playlist.id) }}" method="GET" class="search-form">
+            <input type="text" name="query" value="{{ query or '' }}" placeholder="노래 제목, 아티스트 또는 앨범명 검색" class="search-input">
+            <button type="submit" class="btn">검색</button>
+        </form>
+    </div>
+    
+    {% if query %}
+    <div class="search-results">
+        <h2>검색 결과: "{{ query }}"</h2>
+        
+        {% if songs %}
+        <ul class="song-list">
+            {% for song in songs %}
+            <li class="song-item">
+                <div class="song-info">
+                    <div class="album-thumbnail">
+                        {% if song.album.cover_image %}
+                        <img src="{{ song.album.cover_image }}" alt="{{ song.album.title }} 커버">
+                        {% else %}
+                        <div class="placeholder-thumbnail">
+                            <span>{{ song.album.title[0].upper() }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="song-details">
+                        <h3>{{ song.title }}</h3>
+                        <p class="artist">{{ song.album.artist }}</p>
+                        <p class="album">{{ song.album.title }}</p>
+                    </div>
+                </div>
+                <div class="song-actions">
+                    {% if song.id in playlist_song_ids %}
+                    <span class="added-badge">추가됨</span>
+                    {% else %}
+                    <a href="{{ url_for('add_to_playlist', playlist_id=playlist.id, song_id=song.id, redirect_to='search_songs') }}" class="btn btn-small">추가</a>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="no-results">검색 결과가 없습니다.</p>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="search-prompt">
+        <p>노래 제목, 아티스트 또는 앨범명으로 검색하세요.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .search-container {
+        max-width: 900px;
+        margin: 2rem auto;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+    }
+    
+    .search-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .search-header h1 {
+        margin: 0;
+        color: var(--hotpot-darkest);
+        font-size: 1.8rem;
+    }
+    
+    .search-form-container {
+        margin-bottom: 2rem;
+    }
+    
+    .search-form {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .search-input {
+        flex-grow: 1;
+        padding: 0.8rem 1rem;
+        border: 2px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: var(--hotpot-red);
+        box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
+    }
+    
+    .search-results h2 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: var(--hotpot-darkest);
+        font-size: 1.4rem;
+    }
+    
+    .song-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .song-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        border-bottom: 1px solid #eee;
+        transition: background-color 0.2s;
+    }
+    
+    .song-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .song-info {
+        display: flex;
+        align-items: center;
+    }
+    
+    .album-thumbnail {
+        width: 60px;
+        height: 60px;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-right: 1rem;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .album-thumbnail img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .placeholder-thumbnail {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, var(--hotpot-red) 0%, var(--hotpot-orange) 100%);
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    
+    .song-details h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: var(--hotpot-darkest);
+    }
+    
+    .artist, .album {
+        margin: 0.2rem 0 0 0;
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .song-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .btn-small {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .added-badge {
+        background-color: #28a745;
+        color: white;
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .no-results {
+        color: #888;
+        font-style: italic;
+        text-align: center;
+        padding: 2rem 0;
+    }
+    
+    .search-prompt {
+        text-align: center;
+        padding: 3rem 0;
+        color: #666;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border: 2px solid var(--hotpot-red);
+        color: var(--hotpot-red);
+    }
+    
+    .btn-outline:hover {
+        background-color: rgba(230, 57, 70, 0.1);
+    }
+</style>
+{% endblock %} 

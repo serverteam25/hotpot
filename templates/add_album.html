@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+
+{% block title %}앨범 추가 - Hotpot Music{% endblock %}
+
+{% block content %}
+<section class="form-section">
+    <h1>새 앨범 추가</h1>
+    
+    <div class="youtube-import-container">
+        <h2>유튜브 링크로 앨범 추가</h2>
+        <p class="info-text">유튜브 음악 앨범 또는 플레이리스트 링크를 입력하면 관련 정보를 자동으로 가져옵니다.</p>
+        
+        <div class="input-group">
+            <input type="url" id="youtube-url" placeholder="https://www.youtube.com/playlist?list=..." class="youtube-input">
+            <button id="fetch-album-btn" class="btn">정보 가져오기</button>
+        </div>
+        
+        <div id="loading-indicator" class="hidden">
+            <div class="spinner"></div>
+            <p>앨범 정보를 가져오는 중입니다...</p>
+        </div>
+    </div>
+    
+    <div class="divider">
+        <span>또는 수동으로 입력</span>
+    </div>
+    
+    <form action="{{ url_for('add_album') }}" method="POST" class="form" id="album-form">
+        <input type="hidden" id="youtube_url" name="youtube_url">
+        
+        <div class="form-group">
+            <label for="title">제목 *</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="artist">아티스트 *</label>
+            <input type="text" id="artist" name="artist" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="release_date">발매일</label>
+            <input type="date" id="release_date" name="release_date">
+        </div>
+        
+        <div class="form-group">
+            <label>장르</label>
+            <div class="genre-tags">
+                {% for genre in genres %}
+                <label class="genre-tag">
+                    <input type="checkbox" name="genre" value="{{ genre }}">
+                    <span>{{ genre }}</span>
+                </label>
+                {% endfor %}
+                <label class="genre-tag custom-genre">
+                    <input type="checkbox" id="custom-genre-checkbox">
+                    <span>직접 입력</span>
+                </label>
+                <input type="text" id="custom-genre-input" name="custom_genre" class="hidden" placeholder="장르 입력...">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="cover_image">커버 이미지 URL</label>
+            <input type="url" id="cover_image" name="cover_image" placeholder="https://example.com/image.jpg">
+            <div id="cover-preview" class="hidden">
+                <img id="cover-preview-img" src="" alt="앨범 커버 미리보기">
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn">앨범 추가</button>
+            <a href="{{ url_for('index') }}" class="btn btn-outline">취소</a>
+        </div>
+    </form>
+</section>
+
+<style>
+    .form-section {
+        max-width: 700px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section h1 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: var(--hotpot-darkest);
+        text-align: center;
+    }
+    
+    .youtube-import-container {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .youtube-import-container h2 {
+        font-size: 1.2rem;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        color: var(--hotpot-dark);
+    }
+    
+    .info-text {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    
+    .input-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .youtube-input {
+        flex-grow: 1;
+        padding: 0.7rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    
+    .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .spinner {
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(230, 57, 70, 0.3);
+        border-radius: 50%;
+        border-top-color: var(--hotpot-red);
+        animation: spinner 1s linear infinite;
+    }
+    
+    @keyframes spinner {
+        to { transform: rotate(360deg); }
+    }
+    
+    .divider {
+        text-align: center;
+        margin: 2rem 0;
+        position: relative;
+    }
+    
+    .divider::before, .divider::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: calc(50% - 3rem);
+        height: 1px;
+        background-color: #ddd;
+    }
+    
+    .divider::before {
+        left: 0;
+    }
+    
+    .divider::after {
+        right: 0;
+    }
+    
+    .divider span {
+        display: inline-block;
+        background-color: white;
+        padding: 0 1rem;
+        position: relative;
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.2rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="date"],
+    .form-group input[type="url"] {
+        width: 100%;
+        padding: 0.7rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+    
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--hotpot-red);
+        box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
+    }
+    
+    .genre-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .genre-tag {
+        display: inline-flex;
+        align-items: center;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: 0.4rem 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .genre-tag input[type="checkbox"] {
+        display: none;
+    }
+    
+    .genre-tag:hover {
+        background-color: #e9ecef;
+    }
+    
+    .genre-tag input:checked + span {
+        color: var(--hotpot-red);
+        font-weight: 500;
+    }
+    
+    .genre-tag.selected {
+        background-color: rgba(230, 57, 70, 0.1);
+        border-color: var(--hotpot-red);
+    }
+    
+    #custom-genre-input {
+        margin-top: 0.5rem;
+        display: none;
+    }
+    
+    #cover-preview {
+        margin-top: 1rem;
+        text-align: center;
+    }
+    
+    #cover-preview-img {
+        max-width: 200px;
+        max-height: 200px;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border: 2px solid var(--hotpot-red);
+        color: var(--hotpot-red);
+    }
+    
+    .btn-outline:hover {
+        background-color: rgba(230, 57, 70, 0.1);
+    }
+    
+    .hidden {
+        display: none !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 장르 태그 클릭 이벤트
+        const genreTags = document.querySelectorAll('.genre-tag:not(.custom-genre)');
+        genreTags.forEach(tag => {
+            tag.addEventListener('click', function() {
+                this.classList.toggle('selected');
+            });
+        });
+        
+        // 커스텀 장르 관련
+        const customGenreCheckbox = document.getElementById('custom-genre-checkbox');
+        const customGenreInput = document.getElementById('custom-genre-input');
+        const customGenreTag = document.querySelector('.custom-genre');
+        
+        customGenreCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                customGenreInput.classList.remove('hidden');
+                customGenreInput.focus();
+                customGenreTag.classList.add('selected');
+            } else {
+                customGenreInput.classList.add('hidden');
+                customGenreTag.classList.remove('selected');
+            }
+        });
+        
+        // 커버 이미지 미리보기
+        const coverImageInput = document.getElementById('cover_image');
+        const coverPreview = document.getElementById('cover-preview');
+        const coverPreviewImg = document.getElementById('cover-preview-img');
+        
+        coverImageInput.addEventListener('input', function() {
+            const imageUrl = this.value.trim();
+            if (imageUrl) {
+                coverPreviewImg.src = imageUrl;
+                coverPreview.classList.remove('hidden');
+                
+                // 이미지 로드 오류 시
+                coverPreviewImg.onerror = function() {
+                    coverPreview.classList.add('hidden');
+                    alert('이미지를 불러올 수 없습니다. URL을 확인해주세요.');
+                };
+            } else {
+                coverPreview.classList.add('hidden');
+            }
+        });
+        
+        // 유튜브 링크로 앨범 정보 가져오기
+        const fetchAlbumBtn = document.getElementById('fetch-album-btn');
+        const youtubeUrlInput = document.getElementById('youtube-url');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        
+        fetchAlbumBtn.addEventListener('click', function() {
+            const youtubeUrl = youtubeUrlInput.value.trim();
+            if (!youtubeUrl) {
+                alert('유튜브 URL을 입력해주세요.');
+                return;
+            }
+            
+            loadingIndicator.classList.remove('hidden');
+            
+            // 유튜브 링크를 서버에 전송하여 앨범 정보 가져오기
+            fetch('/fetch_album_info', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ youtube_url: youtubeUrl }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.classList.add('hidden');
+                
+                if (data.success) {
+                    // 폼에 앨범 정보 채우기
+                    document.getElementById('title').value = data.album.title || '';
+                    document.getElementById('artist').value = data.album.artist || '';
+                    document.getElementById('youtube_url').value = youtubeUrl;
+                    
+                    if (data.album.cover_image) {
+                        document.getElementById('cover_image').value = data.album.cover_image;
+                        document.getElementById('cover-preview-img').src = data.album.cover_image;
+                        document.getElementById('cover-preview').classList.remove('hidden');
+                    }
+                    
+                    if (data.album.release_date) {
+                        document.getElementById('release_date').value = data.album.release_date;
+                    }
+                    
+                    if (data.album.genre) {
+                        // 해당 장르 태그가 있으면 선택
+                        const genreFound = Array.from(genreTags).some(tag => {
+                            const genreValue = tag.querySelector('input').value;
+                            if (genreValue.toLowerCase() === data.album.genre.toLowerCase()) {
+                                tag.classList.add('selected');
+                                tag.querySelector('input').checked = true;
+                                return true;
+                            }
+                            return false;
+                        });
+                        
+                        // 일치하는 장르가 없으면 커스텀 입력에 추가
+                        if (!genreFound) {
+                            customGenreCheckbox.checked = true;
+                            customGenreTag.classList.add('selected');
+                            customGenreInput.classList.remove('hidden');
+                            customGenreInput.value = data.album.genre;
+                        }
+                    }
+                    
+                    alert('앨범 정보를 성공적으로 가져왔습니다. 추가 정보를 입력하고 앨범을 추가해주세요.');
+                } else {
+                    alert(data.message || '앨범 정보를 가져오는데 실패했습니다.');
+                }
+            })
+            .catch(error => {
+                loadingIndicator.classList.add('hidden');
+                console.error('Error:', error);
+                alert('오류가 발생했습니다. 다시 시도해주세요.');
+            });
+        });
+    });
+</script>
+{% endblock %} 

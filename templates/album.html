@@ -1,0 +1,553 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ album.title }} - Hotpot Music{% endblock %}
+
+{% block content %}
+<section class="album-detail">
+    <div class="album-header">
+        <div class="album-cover-large">
+            {% if album.cover_image %}
+                <img src="{{ album.cover_image }}" alt="{{ album.title }}">
+            {% else %}
+                <div class="no-image-large">이미지 없음</div>
+            {% endif %}
+        </div>
+        
+        <div class="album-info-large">
+            <h1>{{ album.title }}</h1>
+            <p class="artist-large">{{ album.artist }}</p>
+            
+            {% if album.release_date %}
+                <p class="release-date">발매일: {{ album.release_date.strftime('%Y-%m-%d') }}</p>
+            {% endif %}
+            
+            {% if album.genre %}
+                <p class="genre-large">장르: {{ album.genre }}</p>
+            {% endif %}
+            
+            <div class="rating-large">
+                평점: {{ "%.1f"|format(album.average_rating()) }} / 3
+                <span class="rating-stars-large">
+                    {% for i in range(3) %}
+                        {% if i < album.average_rating()|int %}
+                            ★
+                        {% else %}
+                            ☆
+                        {% endif %}
+                    {% endfor %}
+                </span>
+            </div>
+            
+            <div class="album-actions">
+                {% if current_user.is_authenticated %}
+                    <button class="btn" id="write-review-btn">리뷰 작성</button>
+                {% endif %}
+                
+                {% if current_user.is_authenticated %}
+                    <div class="admin-actions">
+                        <a href="{{ url_for('edit_album', album_id=album.id) }}" class="btn btn-small">앨범 수정</a>
+                        <form action="{{ url_for('delete_album', album_id=album.id) }}" method="POST" class="inline-form" onsubmit="return confirm('정말 이 앨범을 삭제하시겠습니까? 모든 리뷰와 노래가 함께 삭제됩니다.');">
+                            <button type="submit" class="btn btn-small btn-danger">앨범 삭제</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- 노래 섹션 -->
+    <div class="songs-section">
+        <div class="section-header">
+            <h2>수록곡 ({{ songs|length }})</h2>
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('add_song', album_id=album.id) }}" class="btn btn-small">노래 추가</a>
+            {% endif %}
+        </div>
+        
+        {% if songs %}
+            <table class="song-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>제목</th>
+                        <th>재생 시간</th>
+                        {% if current_user.is_authenticated %}
+                            <th>플레이리스트에 추가</th>
+                            <th>동작</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for song in songs %}
+                        <tr>
+                            <td>{% if song.track_number %}{{ song.track_number }}{% else %}{{ loop.index }}{% endif %}</td>
+                            <td class="song-title">{{ song.title }}</td>
+                            <td>
+                                {% if song.duration %}
+                                    {{ (song.duration // 60)|string + ':' + '%02d'|format(song.duration % 60) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            {% if current_user.is_authenticated %}
+                                <td class="playlist-add">
+                                    <select class="playlist-select" data-song-id="{{ song.id }}">
+                                        <option value="">플레이리스트 선택</option>
+                                        {% for playlist in current_user.playlists %}
+                                            <option value="{{ playlist.id }}">{{ playlist.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button class="btn btn-small add-to-playlist-btn" disabled>추가</button>
+                                </td>
+                                <td class="song-actions">
+                                    <a href="{{ url_for('edit_song', song_id=song.id) }}" class="btn btn-small">수정</a>
+                                    <form action="{{ url_for('delete_song', song_id=song.id) }}" method="POST" class="inline-form" onsubmit="return confirm('이 노래를 삭제하시겠습니까?');">
+                                        <button type="submit" class="btn btn-small btn-danger">삭제</button>
+                                    </form>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="no-songs">아직 등록된 노래가 없습니다.</p>
+        {% endif %}
+    </div>
+    
+    <!-- 리뷰 섹션 -->
+    <div class="reviews-section">
+        <div class="section-header">
+            <h2>리뷰</h2>
+        </div>
+        
+        {% if current_user.is_authenticated %}
+            <div class="review-form" id="review-form" style="display: none;">
+                <h3>리뷰 작성</h3>
+                <form action="{{ url_for('add_review', album_id=album.id) }}" method="POST">
+                    <div class="form-group">
+                        <label for="rating">평점:</label>
+                        <div class="star-rating">
+                            <input type="radio" id="rating-0" name="rating" value="0">
+                            <label for="rating-0">☆</label>
+                            
+                            <input type="radio" id="rating-1" name="rating" value="1">
+                            <label for="rating-1">★</label>
+                            
+                            <input type="radio" id="rating-2" name="rating" value="2">
+                            <label for="rating-2">★★</label>
+                            
+                            <input type="radio" id="rating-3" name="rating" value="3">
+                            <label for="rating-3">★★★</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="comment">코멘트:</label>
+                        <textarea id="comment" name="comment" rows="4"></textarea>
+                    </div>
+                    
+                    <div class="form-group checkbox">
+                        <input type="checkbox" id="is_public" name="is_public" checked>
+                        <label for="is_public">공개 리뷰로 작성</label>
+                    </div>
+                    
+                    <button type="submit" class="btn">리뷰 등록</button>
+                </form>
+            </div>
+        {% endif %}
+        
+        <div class="reviews">
+            {% if public_reviews or user_private_reviews %}
+                {% for review in public_reviews %}
+                    <div class="review-card">
+                        <div class="review-header">
+                            <div class="review-user">{{ review.author.username }}</div>
+                            <div class="review-date">{{ review.created_at.strftime('%Y-%m-%d') }}</div>
+                        </div>
+                        
+                        <div class="review-rating">
+                            {% for _ in range(review.rating) %}★{% endfor %}
+                            {% for _ in range(3 - review.rating) %}☆{% endfor %}
+                        </div>
+                        
+                        {% if review.comment %}
+                            <div class="review-comment">{{ review.comment }}</div>
+                        {% endif %}
+                        
+                        {% if current_user.is_authenticated and review.user_id == current_user.id %}
+                            <div class="review-actions">
+                                <a href="{{ url_for('edit_review', review_id=review.id) }}" class="btn btn-small">수정</a>
+                                <form action="{{ url_for('delete_review', review_id=review.id) }}" method="POST" class="inline-form" onsubmit="return confirm('정말로 이 리뷰를 삭제하시겠습니까?');">
+                                    <button type="submit" class="btn btn-small btn-danger">삭제</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                
+                {% if current_user.is_authenticated and user_private_reviews %}
+                    <h3 class="private-reviews-header">내 비공개 리뷰</h3>
+                    
+                    {% for review in user_private_reviews %}
+                        <div class="review-card private">
+                            <div class="review-header">
+                                <div class="review-user">{{ review.author.username }} (비공개)</div>
+                                <div class="review-date">{{ review.created_at.strftime('%Y-%m-%d') }}</div>
+                            </div>
+                            
+                            <div class="review-rating">
+                                {% for _ in range(review.rating) %}★{% endfor %}
+                                {% for _ in range(3 - review.rating) %}☆{% endfor %}
+                            </div>
+                            
+                            {% if review.comment %}
+                                <div class="review-comment">{{ review.comment }}</div>
+                            {% endif %}
+                            
+                            <div class="review-actions">
+                                <a href="{{ url_for('edit_review', review_id=review.id) }}" class="btn btn-small">수정</a>
+                                <form action="{{ url_for('delete_review', review_id=review.id) }}" method="POST" class="inline-form" onsubmit="return confirm('정말로 이 리뷰를 삭제하시겠습니까?');">
+                                    <button type="submit" class="btn btn-small btn-danger">삭제</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% else %}
+                <p class="no-reviews">아직 리뷰가 없습니다. 첫 번째 리뷰를 작성해보세요!</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<style>
+    .album-header {
+        display: flex;
+        margin-bottom: 2rem;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .album-cover-large {
+        width: 200px;
+        height: 200px;
+        flex-shrink: 0;
+    }
+    
+    .album-cover-large img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .no-image-large {
+        width: 100%;
+        height: 100%;
+        background-color: var(--hotpot-medium);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--hotpot-darkest);
+    }
+    
+    .album-info-large {
+        padding: 1.5rem;
+        flex-grow: 1;
+    }
+    
+    .album-info-large h1 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.8rem;
+    }
+    
+    .artist-large {
+        color: var(--hotpot-red);
+        font-size: 1.2rem;
+        margin: 0 0 0.8rem 0;
+    }
+    
+    .release-date, .genre-large {
+        margin: 0.3rem 0;
+        font-size: 0.95rem;
+    }
+    
+    .rating-large {
+        margin: 1rem 0;
+        font-size: 1.1rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+    }
+    
+    .rating-stars-large {
+        color: var(--hotpot-red);
+        margin-left: 0.5rem;
+        font-size: 1.4rem;
+    }
+    
+    .album-actions {
+        margin-top: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .admin-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 2rem 0 1rem 0;
+        border-bottom: 2px solid var(--hotpot-red);
+        padding-bottom: 0.5rem;
+    }
+    
+    .song-table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .song-table th,
+    .song-table td {
+        padding: 0.8rem 1rem;
+        text-align: left;
+    }
+    
+    .song-table th {
+        background-color: var(--hotpot-red);
+        color: white;
+        font-weight: 500;
+    }
+    
+    .song-table tr:nth-child(even) {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+    
+    .song-table tr:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    .song-title {
+        font-weight: 500;
+    }
+    
+    .playlist-add {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .playlist-select {
+        padding: 0.3rem;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        min-width: 150px;
+    }
+    
+    .add-to-playlist-btn {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .add-to-playlist-btn:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+    }
+    
+    .inline-form {
+        display: inline;
+    }
+    
+    .btn-small {
+        padding: 0.3rem 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .btn-danger {
+        background-color: #dc3545;
+    }
+    
+    .btn-danger:hover {
+        background-color: #c82333;
+    }
+    
+    .song-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .no-songs, .no-reviews {
+        text-align: center;
+        padding: 2rem;
+        background-color: white;
+        border-radius: 8px;
+    }
+    
+    .reviews-section {
+        margin-top: 3rem;
+    }
+    
+    .review-form {
+        background-color: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .review-form h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.3rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .star-rating {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .star-rating label {
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: var(--hotpot-red);
+    }
+    
+    .star-rating input {
+        display: none;
+    }
+    
+    textarea {
+        width: 100%;
+        padding: 0.7rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+    
+    .checkbox {
+        display: flex;
+        align-items: center;
+    }
+    
+    .checkbox input {
+        margin-right: 0.5rem;
+    }
+    
+    .checkbox label {
+        margin-bottom: 0;
+    }
+    
+    .reviews {
+        margin-top: 1.5rem;
+    }
+    
+    .review-card {
+        background-color: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .review-card.private {
+        background-color: #f8f9fa;
+        border-left: 4px solid var(--hotpot-red);
+    }
+    
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    
+    .review-user {
+        font-weight: 500;
+    }
+    
+    .review-date {
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .review-rating {
+        color: var(--hotpot-red);
+        font-size: 1.2rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    .review-comment {
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+    
+    .review-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .private-reviews-header {
+        margin: 2rem 0 1rem 0;
+        font-size: 1.2rem;
+        color: var(--hotpot-red);
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 리뷰 작성 폼 토글
+        const writeReviewBtn = document.getElementById('write-review-btn');
+        const reviewForm = document.getElementById('review-form');
+        
+        if (writeReviewBtn && reviewForm) {
+            writeReviewBtn.addEventListener('click', function() {
+                reviewForm.style.display = reviewForm.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+        
+        // 플레이리스트 드롭다운 처리
+        const playlistSelects = document.querySelectorAll('.playlist-select');
+        const addButtons = document.querySelectorAll('.add-to-playlist-btn');
+        
+        playlistSelects.forEach((select, index) => {
+            select.addEventListener('change', function() {
+                const button = addButtons[index];
+                button.disabled = !this.value;
+                
+                if (this.value) {
+                    const songId = this.getAttribute('data-song-id');
+                    const playlistId = this.value;
+                    
+                    button.addEventListener('click', function() {
+                        // 실제로는 AJAX 요청을 보내거나 폼 제출을 통해 처리할 수 있습니다.
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = `/playlist/${playlistId}/add_song/${songId}`;
+                        document.body.appendChild(form);
+                        form.submit();
+                    });
+                }
+            });
+        });
+    });
+</script>
+{% endblock %} 

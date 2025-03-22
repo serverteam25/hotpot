@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ album.title }} 수정 - Hotpot Music{% endblock %}
+
+{% block content %}
+<section class="form-section">
+    <h1>앨범 수정</h1>
+    
+    <form action="{{ url_for('edit_album', album_id=album.id) }}" method="POST" class="form">
+        <div class="form-group">
+            <label for="title">제목 *</label>
+            <input type="text" id="title" name="title" value="{{ album.title }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="artist">아티스트 *</label>
+            <input type="text" id="artist" name="artist" value="{{ album.artist }}" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="release_date">발매일</label>
+            <input type="date" id="release_date" name="release_date" value="{{ album.release_date.strftime('%Y-%m-%d') if album.release_date else '' }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="genre">장르</label>
+            <input type="text" id="genre" name="genre" value="{{ album.genre or '' }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="cover_image">커버 이미지 URL</label>
+            <input type="url" id="cover_image" name="cover_image" value="{{ album.cover_image or '' }}" placeholder="https://example.com/image.jpg">
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn">앨범 수정</button>
+            <a href="{{ url_for('album_detail', album_id=album.id) }}" class="btn btn-outline">취소</a>
+        </div>
+    </form>
+</section>
+
+<style>
+    .form-section {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section h1 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: var(--hotpot-darkest);
+    }
+    
+    .form-group {
+        margin-bottom: 1.2rem;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="date"],
+    .form-group input[type="url"] {
+        width: 100%;
+        padding: 0.7rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+    
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--hotpot-red);
+        box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
+    }
+    
+    .form-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .btn-outline {
+        background-color: transparent;
+        border: 2px solid var(--hotpot-red);
+        color: var(--hotpot-red);
+    }
+    
+    .btn-outline:hover {
+        background-color: rgba(230, 57, 70, 0.1);
+    }
+</style>
+{% endblock %} 
