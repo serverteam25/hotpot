@@ -5,11 +5,13 @@ from models import db, User, Album, Review, Song, Playlist, PlaylistSong
 from config import Config
 from datetime import datetime
 from sqlalchemy import or_
+from lastfm import get_chart_recommended_albums
 import re
 import requests
 import json
 from pytube import YouTube, Playlist as PytubePlaylist
 import urllib.parse
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -35,7 +37,8 @@ def create_tables():
 @app.route('/')
 def index():
     albums = Album.query.order_by(Album.created_at.desc()).all()
-    return render_template('index.html', albums=albums)
+    recommended = get_chart_recommended_albums()  # 추천 앨범 가져오기
+    return render_template('index.html', albums=albums, recommended=recommended)
 
 # 회원가입
 @app.route('/register', methods=['GET', 'POST'])
