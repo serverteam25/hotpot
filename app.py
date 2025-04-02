@@ -5,7 +5,7 @@ from models import db, User, Album, Review, Song, Playlist, PlaylistSong
 from config import Config
 from datetime import datetime
 from sqlalchemy import or_
-from lastfm import get_chart_recommended_albums
+from lastfm import get_chart_recommended_albums, get_album_info
 import re
 import requests
 import json
@@ -132,6 +132,39 @@ def album_detail(album_id):
         playlists=playlists,
         reviews=reviews,
         user_has_review=user_has_review
+    )
+
+@app.route('/album/lastfm')
+def album_detail_lastfm():
+    album_id = request.args.get('album_id')
+    if not album_id:
+        abort(404)
+
+    album_info = get_album_info(album_id)
+    if not album_info:
+        abort(404)
+
+    # 로그인한 사용자의 플레이리스트 가져오기
+    playlists = []
+    if current_user.is_authenticated:
+        playlists = Playlist.query.filter_by(user_id=current_user.id).all()
+    
+
+    return render_template(
+        "album_detail.html",
+        album={
+            "title": album_info["title"],
+            "artist": album_info["artist"],
+            "cover_image": album_info["cover_image"],
+            "release_date": datetime.now().date(),  # 정확한 날짜 없음
+            "genre": ", ".join(album_info["tags"]),
+            "mbid": album_id
+        },
+        songs=None,
+        lastfm_tracks=album_info["tracks"],
+        playlists=playlists,
+        reviews=[],     # 리뷰 없음
+        user_has_review=False
     )
 
 # 장르 목록 (앨범 추가/수정 페이지에서 사용)

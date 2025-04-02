@@ -66,6 +66,7 @@
     <div class="albums-grid">
       {% if recommended %} {% for album in recommended %}
       <div class="album-card">
+        <a href="{{ url_for('album_detail', album_id=album.id) }}">
         <div class="album-cover">
           {% if album.cover_image %}
           <img src="{{ album.cover_image }}" alt="{{ album.title }} 커버" />
@@ -82,6 +83,7 @@
             <button type="submit" class="btn">+</button>
           </form>
         </div>
+        </a>
       </div>
       {% endfor %} {% else %}
       <p class="no-albums">추천할 앨범이 없습니다.</p>

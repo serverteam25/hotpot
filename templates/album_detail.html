@@ -1,892 +1,987 @@
-{% extends 'base.html' %}
-
-{% block title %}{{ album.title }} - {{ album.artist }} - Hotpot Music{% endblock %}
-
-{% block content %}
+{% extends 'base.html' %} {% block title %}{{ album.title }} - {{ album.artist
+}} - Hotpot Music{% endblock %} {% block content %}
 <div class="album-detail-container">
-    <div class="album-header">
-        <div class="album-cover">
-            {% if album.cover_image %}
-            <img src="{{ album.cover_image }}" alt="{{ album.title }} 커버">
-            {% else %}
-            <div class="placeholder-cover">
-                <span>{{ album.title[0].upper() }}</span>
+  <div class="album-header">
+    <div class="album-cover">
+      {% if album.cover_image %}
+      <img src="{{ album.cover_image }}" alt="{{ album.title }} 커버" />
+      {% else %}
+      <div class="placeholder-cover">
+        <span>{{ album.title[0].upper() }}</span>
+      </div>
+      {% endif %}
+    </div>
+    <div class="album-info">
+      <h1>{{ album.title }}</h1>
+      <p class="artist">{{ album.artist }}</p>
+
+      {% if album.release_date %}
+      <p class="release-date">
+        발매일: {{ album.release_date.strftime('%Y-%m-%d') }}
+      </p>
+      {% endif %} {% if album.genre %}
+      <span class="genre-badge">{{ album.genre }}</span>
+      {% endif %}
+
+      <div class="album-actions">
+        {% if songs and songs|length > 0 %}
+        <button class="btn" onclick="playFirstSong()">
+          <i class="fas fa-play"></i> 앨범 재생
+        </button>
+        {% endif %} {% if current_user.is_authenticated %}
+        <a href="{{ url_for('edit_album', album_id=album.id) }}" class="btn"
+          >앨범 정보 수정</a
+        >
+        <a
+          href="{{ url_for('add_song', album_id=album.id) }}"
+          class="btn btn-outline"
+          >노래 추가</a
+        >
+        <a
+          href="{{ url_for('delete_album', album_id=album.id) }}"
+          class="btn btn-danger"
+          onclick="return confirm('정말로 이 앨범을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');"
+          >앨범 삭제</a
+        >
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="album-content">
+    <div class="songs-section">
+      <h2>수록곡</h2>
+
+      {% if songs %}
+      <ul class="song-list">
+        {% for song in songs %}
+        <li class="song-item" data-song-id="{{ song.id }}">
+          <div class="song-info">
+            {% if song.track_number %}
+            <span class="track-number">{{ song.track_number }}</span>
+            {% endif %}
+            <div class="song-details">
+              <h3 class="song-title">{{ song.title }}</h3>
+              {% if song.duration %}
+              <span class="song-duration">{{ song.duration }}</span>
+              {% endif %}
             </div>
+          </div>
+          <div class="song-actions">
+            {% if current_user.is_authenticated %}
+            <button
+              class="btn-add-to-playlist"
+              title="플레이리스트에 추가하기"
+              onclick="showPlaylistModal({{ song.id }})"
+            >
+              <i class="fas fa-plus"></i>
+            </button>
+            {% endif %} {% if song.youtube_url %}
+            <button
+              class="btn-play"
+              title="재생하기"
+              onclick="playSong({{ song.id }}, '{{ song.youtube_embed_url|safe }}', '{{ song.title|safe }}')"
+            >
+              <i class="fas fa-play"></i>
+            </button>
+            {% endif %} {% if current_user.is_authenticated and
+            song.album.user_id == current_user.id %}
+            <a
+              href="{{ url_for('edit_song', song_id=song.id) }}"
+              class="btn-edit"
+              title="수정하기"
+            >
+              <i class="fas fa-edit"></i>
+            </a>
+            <button
+              class="btn-delete"
+              title="삭제하기"
+              onclick="confirmDeleteSong({{ song.id }})"
+            >
+              <i class="fas fa-trash"></i>
+            </button>
             {% endif %}
-        </div>
-        <div class="album-info">
-            <h1>{{ album.title }}</h1>
-            <p class="artist">{{ album.artist }}</p>
-            
-            {% if album.release_date %}
-            <p class="release-date">발매일: {{ album.release_date.strftime('%Y-%m-%d') }}</p>
-            {% endif %}
-            
-            {% if album.genre %}
-            <span class="genre-badge">{{ album.genre }}</span>
-            {% endif %}
-            
-            <div class="album-actions">
-                {% if songs and songs|length > 0 %}
-                <button class="btn" onclick="playFirstSong()">
-                    <i class="fas fa-play"></i> 앨범 재생
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="no-songs">
+        <p>아직 등록된 노래가 없습니다.</p>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('add_song', album_id=album.id) }}" class="btn"
+          >노래 추가하기</a
+        >
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- 리뷰 섹션 추가 -->
+    <div class="reviews-section">
+      <h2>리뷰</h2>
+
+      <!-- 로그인한 사용자만 리뷰 작성 가능 -->
+      {% if current_user.is_authenticated and not user_has_review %}
+      <div class="review-form-container">
+        <h3>리뷰 작성하기</h3>
+        <form
+          action="{{ url_for('add_review', album_id=album.id) }}"
+          method="POST"
+          class="review-form"
+        >
+          <div class="star-rating">
+            <label>별점:</label>
+            <div class="rating-options">
+              <input type="radio" id="star0" name="rating" value="0" required />
+              <label for="star0">0</label>
+
+              <input type="radio" id="star1" name="rating" value="1" />
+              <label for="star1">1</label>
+
+              <input type="radio" id="star2" name="rating" value="2" />
+              <label for="star2">2</label>
+
+              <input type="radio" id="star3" name="rating" value="3" />
+              <label for="star3">3</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="comment">코멘트:</label>
+            <textarea id="comment" name="comment" rows="4" required></textarea>
+          </div>
+
+          <button type="submit" class="btn">리뷰 등록</button>
+        </form>
+      </div>
+      {% elif not current_user.is_authenticated %}
+      <div class="login-prompt">
+        <p>
+          리뷰를 작성하려면 <a href="{{ url_for('login') }}">로그인</a>이
+          필요합니다.
+        </p>
+      </div>
+      {% endif %}
+
+      <!-- 리뷰 목록 -->
+      <div class="reviews-list">
+        {% if reviews %} {% for review in reviews %}
+        <div class="review-item" id="review-{{ review.id }}">
+          <div class="review-header">
+            <div class="review-user">
+              <span class="username">{{ review.author.username }}</span>
+              <span class="review-date"
+                >{{ review.created_at.strftime('%Y-%m-%d') }}</span
+              >
+            </div>
+            <div class="review-rating">
+              {% for i in range(review.rating) %}
+              <span class="star">★</span>
+              {% endfor %} {% for i in range(3 - review.rating) %}
+              <span class="star empty">☆</span>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="review-content">
+            <p>{{ review.comment }}</p>
+          </div>
+          {% if current_user.is_authenticated and review.user_id ==
+          current_user.id %}
+          <div class="review-actions">
+            <button
+              class="btn-edit-review"
+              onclick="showEditReviewForm({{ review.id }})"
+            >
+              수정
+            </button>
+            <a
+              href="{{ url_for('delete_review', review_id=review.id) }}"
+              class="btn-delete-review"
+              onclick="return confirm('리뷰를 삭제하시겠습니까?')"
+              >삭제</a
+            >
+          </div>
+
+          <!-- 숨겨진 리뷰 수정 폼 -->
+          <div
+            class="edit-review-form"
+            id="edit-form-{{ review.id }}"
+            style="display: none"
+          >
+            <form
+              action="{{ url_for('edit_review', review_id=review.id) }}"
+              method="POST"
+            >
+              <div class="star-rating">
+                <label>별점:</label>
+                <div class="rating-options">
+                  <input type="radio" id="edit-star0-{{ review.id }}"
+                  name="rating" value="0" {% if review.rating == 0 %}checked{%
+                  endif %} required>
+                  <label for="edit-star0-{{ review.id }}">0</label>
+
+                  <input type="radio" id="edit-star1-{{ review.id }}"
+                  name="rating" value="1" {% if review.rating == 1 %}checked{%
+                  endif %}>
+                  <label for="edit-star1-{{ review.id }}">1</label>
+
+                  <input type="radio" id="edit-star2-{{ review.id }}"
+                  name="rating" value="2" {% if review.rating == 2 %}checked{%
+                  endif %}>
+                  <label for="edit-star2-{{ review.id }}">2</label>
+
+                  <input type="radio" id="edit-star3-{{ review.id }}"
+                  name="rating" value="3" {% if review.rating == 3 %}checked{%
+                  endif %}>
+                  <label for="edit-star3-{{ review.id }}">3</label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="edit-comment-{{ review.id }}">코멘트:</label>
+                <textarea
+                  id="edit-comment-{{ review.id }}"
+                  name="comment"
+                  rows="4"
+                  required
+                >
+{{ review.comment }}</textarea
+                >
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn">수정</button>
+                <button
+                  type="button"
+                  class="btn-outline"
+                  onclick="hideEditReviewForm({{ review.id }})"
+                >
+                  취소
                 </button>
-                {% endif %}
-                {% if current_user.is_authenticated %}
-                <a href="{{ url_for('edit_album', album_id=album.id) }}" class="btn">앨범 정보 수정</a>
-                <a href="{{ url_for('add_song', album_id=album.id) }}" class="btn btn-outline">노래 추가</a>
-                <a href="{{ url_for('delete_album', album_id=album.id) }}" class="btn btn-danger" onclick="return confirm('정말로 이 앨범을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');">앨범 삭제</a>
-                {% endif %}
-            </div>
+              </div>
+            </form>
+          </div>
+          {% endif %}
         </div>
+        {% endfor %} {% else %}
+        <div class="no-reviews">
+          <p>이 앨범에 대한 리뷰가 아직 없습니다. 첫 리뷰를 작성해보세요!</p>
+        </div>
+        {% endif %}
+      </div>
     </div>
-    
-    <div class="album-content">
-        <div class="songs-section">
-            <h2>수록곡</h2>
-            
-            {% if songs %}
-            <ul class="song-list">
-                {% for song in songs %}
-                <li class="song-item" data-song-id="{{ song.id }}">
-                    <div class="song-info">
-                        {% if song.track_number %}
-                        <span class="track-number">{{ song.track_number }}</span>
-                        {% endif %}
-                        <div class="song-details">
-                            <h3 class="song-title">{{ song.title }}</h3>
-                            {% if song.duration %}
-                            <span class="song-duration">{{ song.duration }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="song-actions">
-                        {% if current_user.is_authenticated %}
-                        <button class="btn-add-to-playlist" title="플레이리스트에 추가하기" onclick="showPlaylistModal({{ song.id }})">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        {% endif %}
-                        {% if song.youtube_url %}
-                        <button class="btn-play" title="재생하기" onclick="playSong({{ song.id }}, '{{ song.youtube_embed_url|safe }}', '{{ song.title|safe }}')">
-                            <i class="fas fa-play"></i>
-                        </button>
-                        {% endif %}
-                        {% if current_user.is_authenticated and song.album.user_id == current_user.id %}
-                        <a href="{{ url_for('edit_song', song_id=song.id) }}" class="btn-edit" title="수정하기">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <button class="btn-delete" title="삭제하기" onclick="confirmDeleteSong({{ song.id }})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        {% endif %}
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <div class="no-songs">
-                <p>아직 등록된 노래가 없습니다.</p>
-                {% if current_user.is_authenticated %}
-                <a href="{{ url_for('add_song', album_id=album.id) }}" class="btn">노래 추가하기</a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-        
-        <!-- 리뷰 섹션 추가 -->
-        <div class="reviews-section">
-            <h2>리뷰</h2>
-            
-            <!-- 로그인한 사용자만 리뷰 작성 가능 -->
-            {% if current_user.is_authenticated and not user_has_review %}
-            <div class="review-form-container">
-                <h3>리뷰 작성하기</h3>
-                <form action="{{ url_for('add_review', album_id=album.id) }}" method="POST" class="review-form">
-                    <div class="star-rating">
-                        <label>별점:</label>
-                        <div class="rating-options">
-                            <input type="radio" id="star0" name="rating" value="0" required>
-                            <label for="star0">0</label>
-                            
-                            <input type="radio" id="star1" name="rating" value="1">
-                            <label for="star1">1</label>
-                            
-                            <input type="radio" id="star2" name="rating" value="2">
-                            <label for="star2">2</label>
-                            
-                            <input type="radio" id="star3" name="rating" value="3">
-                            <label for="star3">3</label>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="comment">코멘트:</label>
-                        <textarea id="comment" name="comment" rows="4" required></textarea>
-                    </div>
-                    
-                    <button type="submit" class="btn">리뷰 등록</button>
-                </form>
-            </div>
-            {% elif not current_user.is_authenticated %}
-            <div class="login-prompt">
-                <p>리뷰를 작성하려면 <a href="{{ url_for('login') }}">로그인</a>이 필요합니다.</p>
-            </div>
-            {% endif %}
-            
-            <!-- 리뷰 목록 -->
-            <div class="reviews-list">
-                {% if reviews %}
-                    {% for review in reviews %}
-                    <div class="review-item" id="review-{{ review.id }}">
-                        <div class="review-header">
-                            <div class="review-user">
-                                <span class="username">{{ review.author.username }}</span>
-                                <span class="review-date">{{ review.created_at.strftime('%Y-%m-%d') }}</span>
-                            </div>
-                            <div class="review-rating">
-                                {% for i in range(review.rating) %}
-                                <span class="star">★</span>
-                                {% endfor %}
-                                {% for i in range(3 - review.rating) %}
-                                <span class="star empty">☆</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        <div class="review-content">
-                            <p>{{ review.comment }}</p>
-                        </div>
-                        {% if current_user.is_authenticated and review.user_id == current_user.id %}
-                        <div class="review-actions">
-                            <button class="btn-edit-review" onclick="showEditReviewForm({{ review.id }})">수정</button>
-                            <a href="{{ url_for('delete_review', review_id=review.id) }}" class="btn-delete-review" onclick="return confirm('리뷰를 삭제하시겠습니까?')">삭제</a>
-                        </div>
-                        
-                        <!-- 숨겨진 리뷰 수정 폼 -->
-                        <div class="edit-review-form" id="edit-form-{{ review.id }}" style="display: none;">
-                            <form action="{{ url_for('edit_review', review_id=review.id) }}" method="POST">
-                                <div class="star-rating">
-                                    <label>별점:</label>
-                                    <div class="rating-options">
-                                        <input type="radio" id="edit-star0-{{ review.id }}" name="rating" value="0" {% if review.rating == 0 %}checked{% endif %} required>
-                                        <label for="edit-star0-{{ review.id }}">0</label>
-                                        
-                                        <input type="radio" id="edit-star1-{{ review.id }}" name="rating" value="1" {% if review.rating == 1 %}checked{% endif %}>
-                                        <label for="edit-star1-{{ review.id }}">1</label>
-                                        
-                                        <input type="radio" id="edit-star2-{{ review.id }}" name="rating" value="2" {% if review.rating == 2 %}checked{% endif %}>
-                                        <label for="edit-star2-{{ review.id }}">2</label>
-                                        
-                                        <input type="radio" id="edit-star3-{{ review.id }}" name="rating" value="3" {% if review.rating == 3 %}checked{% endif %}>
-                                        <label for="edit-star3-{{ review.id }}">3</label>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="edit-comment-{{ review.id }}">코멘트:</label>
-                                    <textarea id="edit-comment-{{ review.id }}" name="comment" rows="4" required>{{ review.comment }}</textarea>
-                                </div>
-                                
-                                <div class="form-actions">
-                                    <button type="submit" class="btn">수정</button>
-                                    <button type="button" class="btn-outline" onclick="hideEditReviewForm({{ review.id }})">취소</button>
-                                </div>
-                            </form>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="no-reviews">
-                        <p>이 앨범에 대한 리뷰가 아직 없습니다. 첫 리뷰를 작성해보세요!</p>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
 <!-- 플레이리스트 모달 -->
 <div id="playlist-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-modal">&times;</span>
-        <h2>플레이리스트에 추가</h2>
-        <div id="playlist-list">
-            {% if current_user.is_authenticated and playlists %}
-                <ul>
-                {% for playlist in playlists %}
-                    <li>
-                        <button class="add-to-playlist-btn" data-playlist-id="{{ playlist.id }}">
-                            {{ playlist.name }}
-                        </button>
-                    </li>
-                {% endfor %}
-                </ul>
-            {% else %}
-                <p>플레이리스트가 없습니다. <a href="{{ url_for('create_playlist') }}">새 플레이리스트 만들기</a></p>
-            {% endif %}
-        </div>
+  <div class="modal-content">
+    <span class="close-modal">&times;</span>
+    <h2>플레이리스트에 추가</h2>
+    <div id="playlist-list">
+      {% if current_user.is_authenticated and playlists %}
+      <ul>
+        {% for playlist in playlists %}
+        <li>
+          <button
+            class="add-to-playlist-btn"
+            data-playlist-id="{{ playlist.id }}"
+          >
+            {{ playlist.name }}
+          </button>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>
+        플레이리스트가 없습니다.
+        <a href="{{ url_for('create_playlist') }}">새 플레이리스트 만들기</a>
+      </p>
+      {% endif %}
     </div>
+  </div>
 </div>
 
 <!-- 노래 재생 모달 -->
 <div id="player-modal" class="modal">
-    <div class="modal-content player-modal-content">
-        <span class="close-modal">&times;</span>
-        <h2 id="player-song-title"></h2>
-        <div class="youtube-player-container">
-            <iframe id="youtube-player" width="560" height="315" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        </div>
+  <div class="modal-content player-modal-content">
+    <span class="close-modal">&times;</span>
+    <h2 id="player-song-title"></h2>
+    <div class="youtube-player-container">
+      <iframe
+        id="youtube-player"
+        width="560"
+        height="315"
+        src=""
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+      ></iframe>
     </div>
+  </div>
 </div>
 
 <style>
-    .album-detail-container {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-    
+  .album-detail-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .album-header {
+    display: flex;
+    background-color: white;
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .album-cover {
+    width: 250px;
+    height: 250px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-right: 2rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  .album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .placeholder-cover {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(
+      135deg,
+      var(--hotpot-red) 0%,
+      var(--hotpot-orange) 100%
+    );
+    color: white;
+    font-size: 5rem;
+    font-weight: bold;
+  }
+
+  .album-info {
+    flex: 1;
+  }
+
+  .album-info h1 {
+    margin: 0 0 0.5rem 0;
+    color: var(--hotpot-darkest);
+    font-size: 2.2rem;
+  }
+
+  .artist {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+    color: var(--hotpot-dark);
+  }
+
+  .release-date {
+    margin-bottom: 1rem;
+    color: #666;
+  }
+
+  .genre-badge {
+    display: inline-block;
+    background-color: #f1f3f5;
+    color: #495057;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .album-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .album-content {
+    background-color: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .songs-section h2 {
+    margin-top: 0;
+    margin-bottom: 2rem;
+    color: var(--hotpot-darkest);
+  }
+
+  .song-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .song-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 0;
+    border-bottom: 1px solid #eee;
+  }
+
+  .song-item:last-child {
+    border-bottom: none;
+  }
+
+  .song-info {
+    display: flex;
+    align-items: center;
+  }
+
+  .song-number {
+    width: 30px;
+    text-align: center;
+    margin-right: 1.5rem;
+    color: #888;
+    font-weight: 500;
+  }
+
+  .song-details h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--hotpot-darkest);
+  }
+
+  .duration {
+    display: inline-block;
+    color: #999;
+    font-size: 0.9rem;
+    margin-left: 1rem;
+  }
+
+  .song-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .playlist-add-container {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .playlist-select {
+    padding: 0.4rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+
+  .song-edit-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .no-songs {
+    text-align: center;
+    padding: 3rem 0;
+    color: #777;
+  }
+
+  .no-songs p {
+    margin-bottom: 1.5rem;
+  }
+
+  /* 반응형 디자인 */
+  @media (max-width: 768px) {
     .album-header {
-        display: flex;
-        background-color: white;
-        border-radius: 8px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+      flex-direction: column;
     }
-    
+
     .album-cover {
-        width: 250px;
-        height: 250px;
-        border-radius: 8px;
-        overflow: hidden;
-        margin-right: 2rem;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      height: 300px;
+      margin-right: 0;
+      margin-bottom: 2rem;
     }
-    
-    .album-cover img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    
-    .placeholder-cover {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(135deg, var(--hotpot-red) 0%, var(--hotpot-orange) 100%);
-        color: white;
-        font-size: 5rem;
-        font-weight: bold;
-    }
-    
-    .album-info {
-        flex: 1;
-    }
-    
-    .album-info h1 {
-        margin: 0 0 0.5rem 0;
-        color: var(--hotpot-darkest);
-        font-size: 2.2rem;
-    }
-    
-    .artist {
-        font-size: 1.4rem;
-        margin-bottom: 1rem;
-        color: var(--hotpot-dark);
-    }
-    
-    .release-date {
-        margin-bottom: 1rem;
-        color: #666;
-    }
-    
-    .genre-badge {
-        display: inline-block;
-        background-color: #f1f3f5;
-        color: #495057;
-        padding: 0.4rem 0.8rem;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        margin-bottom: 1.5rem;
-    }
-    
-    .album-actions {
-        display: flex;
-        gap: 1rem;
-        margin-top: 1.5rem;
-    }
-    
-    .album-content {
-        background-color: white;
-        border-radius: 8px;
-        padding: 2rem;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-    }
-    
-    .songs-section h2 {
-        margin-top: 0;
-        margin-bottom: 2rem;
-        color: var(--hotpot-darkest);
-    }
-    
-    .song-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-    
+
     .song-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.2rem 0;
-        border-bottom: 1px solid #eee;
+      flex-direction: column;
+      align-items: flex-start;
     }
-    
-    .song-item:last-child {
-        border-bottom: none;
-    }
-    
-    .song-info {
-        display: flex;
-        align-items: center;
-    }
-    
-    .song-number {
-        width: 30px;
-        text-align: center;
-        margin-right: 1.5rem;
-        color: #888;
-        font-weight: 500;
-    }
-    
-    .song-details h3 {
-        margin: 0;
-        font-size: 1.1rem;
-        color: var(--hotpot-darkest);
-    }
-    
-    .duration {
-        display: inline-block;
-        color: #999;
-        font-size: 0.9rem;
-        margin-left: 1rem;
-    }
-    
+
     .song-actions {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
+      margin-top: 1rem;
+      width: 100%;
+      justify-content: space-between;
     }
-    
-    .playlist-add-container {
-        display: flex;
-        gap: 0.5rem;
+  }
+
+  /* 플레이리스트 및 재생 모달 스타일 */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+
+  .modal-content {
+    position: relative;
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    animation: modal-fade-in 0.3s;
+  }
+
+  .player-modal-content {
+    max-width: 600px;
+  }
+
+  .close-modal {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .close-modal:hover {
+    color: var(--hotpot-dark);
+  }
+
+  #playlist-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 15px 0;
+  }
+
+  #playlist-list li {
+    margin: 8px 0;
+  }
+
+  .add-to-playlist-btn {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    border-radius: 4px;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .add-to-playlist-btn:hover {
+    background-color: #e9ecef;
+    border-color: var(--hotpot-red);
+  }
+
+  .youtube-player-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 비율 */
+    height: 0;
+    overflow: hidden;
+    margin-top: 20px;
+  }
+
+  .youtube-player-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  @keyframes modal-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
     }
-    
-    .playlist-select {
-        padding: 0.4rem;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 0.9rem;
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
-    
-    .song-edit-actions {
-        display: flex;
-        gap: 0.5rem;
-    }
-    
-    .no-songs {
-        text-align: center;
-        padding: 3rem 0;
-        color: #777;
-    }
-    
-    .no-songs p {
-        margin-bottom: 1.5rem;
-    }
-    
-    /* 반응형 디자인 */
-    @media (max-width: 768px) {
-        .album-header {
-            flex-direction: column;
-        }
-        
-        .album-cover {
-            width: 100%;
-            height: 300px;
-            margin-right: 0;
-            margin-bottom: 2rem;
-        }
-        
-        .song-item {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        
-        .song-actions {
-            margin-top: 1rem;
-            width: 100%;
-            justify-content: space-between;
-        }
-    }
-    
-    /* 플레이리스트 및 재생 모달 스타일 */
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow: auto;
-        background-color: rgba(0,0,0,0.7);
-    }
-    
-    .modal-content {
-        position: relative;
-        background-color: #fff;
-        margin: 10% auto;
-        padding: 20px;
-        border-radius: 8px;
-        width: 80%;
-        max-width: 500px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-        animation: modal-fade-in 0.3s;
-    }
-    
-    .player-modal-content {
-        max-width: 600px;
-    }
-    
-    .close-modal {
-        position: absolute;
-        right: 20px;
-        top: 15px;
-        color: #aaa;
-        font-size: 28px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-    
-    .close-modal:hover {
-        color: var(--hotpot-dark);
-    }
-    
-    #playlist-list ul {
-        list-style: none;
-        padding: 0;
-        margin: 15px 0;
-    }
-    
-    #playlist-list li {
-        margin: 8px 0;
-    }
-    
-    .add-to-playlist-btn {
-        background-color: #f8f9fa;
-        border: 1px solid #ddd;
-        padding: 8px 12px;
-        border-radius: 4px;
-        width: 100%;
-        text-align: left;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    
-    .add-to-playlist-btn:hover {
-        background-color: #e9ecef;
-        border-color: var(--hotpot-red);
-    }
-    
-    .youtube-player-container {
-        position: relative;
-        width: 100%;
-        padding-bottom: 56.25%; /* 16:9 비율 */
-        height: 0;
-        overflow: hidden;
-        margin-top: 20px;
-    }
-    
-    .youtube-player-container iframe {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 4px;
-    }
-    
-    @keyframes modal-fade-in {
-        from {opacity: 0; transform: translateY(-20px);}
-        to {opacity: 1; transform: translateY(0);}
-    }
-    
-    .btn-primary {
-        background-color: var(--hotpot-red);
-        color: white;
-        border: none;
-        transition: all 0.2s;
-    }
-    
-    .btn-primary:hover {
-        background-color: var(--hotpot-orange);
-    }
-    
-    .play-album-btn {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    
-    /* 리뷰 섹션 스타일 */
-    .reviews-section {
-        margin-top: 3rem;
-        border-top: 1px solid #eee;
-        padding-top: 2rem;
-    }
-    
-    .reviews-section h2 {
-        margin-top: 0;
-        margin-bottom: 1.5rem;
-        color: var(--hotpot-darkest);
-    }
-    
-    .review-form-container {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    
-    .review-form-container h3 {
-        margin-top: 0;
-        margin-bottom: 1rem;
-        font-size: 1.2rem;
-        color: var(--hotpot-darkest);
-    }
-    
-    .star-rating {
-        margin-bottom: 1rem;
-    }
-    
-    .rating-options {
-        display: flex;
-        gap: 1.5rem;
-        margin-top: 0.5rem;
-    }
-    
-    .rating-options input[type="radio"] {
-        display: none;
-    }
-    
-    .rating-options label {
-        cursor: pointer;
-        font-size: 1.5rem;
-        color: #ccc;
-        transition: color 0.2s;
-    }
-    
-    .rating-options input[type="radio"]:checked + label {
-        color: var(--hotpot-orange);
-    }
-    
-    .rating-options label:hover {
-        color: var(--hotpot-yellow);
-    }
-    
-    .review-item {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    .review-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 1rem;
-    }
-    
-    .review-user {
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .username {
-        font-weight: 500;
-        color: var(--hotpot-darkest);
-    }
-    
-    .review-date {
-        font-size: 0.9rem;
-        color: #777;
-    }
-    
-    .review-rating {
-        display: flex;
-        gap: 0.25rem;
-    }
-    
-    .star {
-        color: var(--hotpot-orange);
-    }
-    
-    .star.empty {
-        color: #ccc;
-    }
-    
-    .review-content {
-        color: #333;
-        margin-bottom: 1rem;
-    }
-    
-    .review-actions {
-        display: flex;
-        gap: 1rem;
-    }
-    
-    .btn-edit-review, .btn-delete-review {
-        font-size: 0.9rem;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: var(--hotpot-blue);
-        padding: 0.3rem 0.6rem;
-        border-radius: 4px;
-        transition: background-color 0.2s;
-    }
-    
-    .btn-edit-review:hover, .btn-delete-review:hover {
-        background-color: rgba(0, 0, 0, 0.05);
-    }
-    
-    .btn-delete-review {
-        color: #dc3545;
-    }
-    
-    .edit-review-form {
-        margin-top: 1rem;
-        padding: 1rem;
-        background-color: white;
-        border-radius: 8px;
-        border: 1px solid #eee;
-    }
-    
-    .login-prompt {
-        text-align: center;
-        padding: 1.5rem;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        margin-bottom: 2rem;
-    }
-    
-    .no-reviews {
-        text-align: center;
-        padding: 2rem;
-        color: #777;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-    }
+  }
+
+  .btn-primary {
+    background-color: var(--hotpot-red);
+    color: white;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--hotpot-orange);
+  }
+
+  .play-album-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* 리뷰 섹션 스타일 */
+  .reviews-section {
+    margin-top: 3rem;
+    border-top: 1px solid #eee;
+    padding-top: 2rem;
+  }
+
+  .reviews-section h2 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: var(--hotpot-darkest);
+  }
+
+  .review-form-container {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .review-form-container h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: var(--hotpot-darkest);
+  }
+
+  .star-rating {
+    margin-bottom: 1rem;
+  }
+
+  .rating-options {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .rating-options input[type="radio"] {
+    display: none;
+  }
+
+  .rating-options label {
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #ccc;
+    transition: color 0.2s;
+  }
+
+  .rating-options input[type="radio"]:checked + label {
+    color: var(--hotpot-orange);
+  }
+
+  .rating-options label:hover {
+    color: var(--hotpot-yellow);
+  }
+
+  .review-item {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .review-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .review-user {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .username {
+    font-weight: 500;
+    color: var(--hotpot-darkest);
+  }
+
+  .review-date {
+    font-size: 0.9rem;
+    color: #777;
+  }
+
+  .review-rating {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .star {
+    color: var(--hotpot-orange);
+  }
+
+  .star.empty {
+    color: #ccc;
+  }
+
+  .review-content {
+    color: #333;
+    margin-bottom: 1rem;
+  }
+
+  .review-actions {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .btn-edit-review,
+  .btn-delete-review {
+    font-size: 0.9rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--hotpot-blue);
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .btn-edit-review:hover,
+  .btn-delete-review:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  .btn-delete-review {
+    color: #dc3545;
+  }
+
+  .edit-review-form {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: white;
+    border-radius: 8px;
+    border: 1px solid #eee;
+  }
+
+  .login-prompt {
+    text-align: center;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+  }
+
+  .no-reviews {
+    text-align: center;
+    padding: 2rem;
+    color: #777;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+  }
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // 플레이리스트 선택 시 버튼 활성화
-        const playlistSelects = document.querySelectorAll('.playlist-select');
-        const addButtons = document.querySelectorAll('.add-to-playlist-btn');
-        
-        playlistSelects.forEach((select, index) => {
-            select.addEventListener('change', function() {
-                const button = addButtons[index];
-                const songId = button.dataset.songId;
-                button.disabled = !this.value;
-                
-                // 버튼 클릭 이벤트 설정
-                button.onclick = function() {
-                    const playlistId = select.value;
-                    if (playlistId) {
-                        window.location.href = `/add_to_playlist/${playlistId}/${songId}?redirect_to=album_detail&album_id={{ album.id }}`;
-                    }
-                };
-            });
-        });
-    });
+  document.addEventListener('DOMContentLoaded', function() {
+      // 플레이리스트 선택 시 버튼 활성화
+      const playlistSelects = document.querySelectorAll('.playlist-select');
+      const addButtons = document.querySelectorAll('.add-to-playlist-btn');
 
-    // 플레이리스트 모달 관련 함수들
-    const playlistModal = document.getElementById('playlist-modal');
-    const playerModal = document.getElementById('player-modal');
-    const closeModalButtons = document.querySelectorAll('.close-modal');
-    let currentSongId = null;
-    
-    // 첫 번째 노래 재생 함수
-    function playFirstSong() {
-        {% if songs and songs|length > 0 %}
-            const firstSong = {{ songs[0].id }};
-            const youtubeUrl = "{{ songs[0].youtube_embed_url|safe }}";
-            const songTitle = "{{ songs[0].title|safe }}";
-            
-            if (youtubeUrl) {
-                playSong(firstSong, youtubeUrl, songTitle);
-            } else {
-                alert("재생 가능한 링크가 없습니다.");
-            }
-        {% else %}
-            alert("재생할 노래가 없습니다.");
-        {% endif %}
-    }
-    
-    function openPlaylistModal(songId) {
-        currentSongId = songId;
-        playlistModal.style.display = 'block';
-    }
+      playlistSelects.forEach((select, index) => {
+          select.addEventListener('change', function() {
+              const button = addButtons[index];
+              const songId = button.dataset.songId;
+              button.disabled = !this.value;
 
-    // 모든 닫기 버튼에 이벤트 리스너 추가
-    closeModalButtons.forEach(function(button) {
-        button.addEventListener('click', function() {
-            playlistModal.style.display = 'none';
-            playerModal.style.display = 'none';
-            youtubePlayer.src = '';  // 플레이어 중지
-        });
-    });
+              // 버튼 클릭 이벤트 설정
+              button.onclick = function() {
+                  const playlistId = select.value;
+                  if (playlistId) {
+                      window.location.href = `/add_to_playlist/${playlistId}/${songId}?redirect_to=album_detail&album_id={{ album.id }}`;
+                  }
+              };
+          });
+      });
+  });
 
-    // 모달 바깥 클릭시 닫힘
-    window.addEventListener('click', function(event) {
-        if (event.target === playlistModal) {
-            playlistModal.style.display = 'none';
-        }
-        if (event.target === playerModal) {
-            playerModal.style.display = 'none';
-            youtubePlayer.src = '';  // 플레이어 중지
-        }
-    });
+  // 플레이리스트 모달 관련 함수들
+  const playlistModal = document.getElementById('playlist-modal');
+  const playerModal = document.getElementById('player-modal');
+  const closeModalButtons = document.querySelectorAll('.close-modal');
+  let currentSongId = null;
 
-    // 플레이리스트 선택 시
-    document.querySelectorAll('.add-to-playlist-btn').forEach(function(button) {
-        button.addEventListener('click', function() {
-            const playlistId = this.getAttribute('data-playlist-id');
-            addSongToPlaylist(playlistId, currentSongId);
-        });
-    });
+  // 첫 번째 노래 재생 함수
+  function playFirstSong() {
+      {% if songs and songs|length > 0 %}
+          const firstSong = {{ songs[0].id }};
+          const youtubeUrl = "{{ songs[0].youtube_embed_url|safe }}";
+          const songTitle = "{{ songs[0].title|safe }}";
 
-    // 전역 함수
-    function showPlaylistModal(songId) {
-        currentSongId = songId;
-        document.getElementById('playlist-modal').style.display = 'block';
-    }
+          if (youtubeUrl) {
+              playSong(firstSong, youtubeUrl, songTitle);
+          } else {
+              alert("재생 가능한 링크가 없습니다.");
+          }
+      {% else %}
+          alert("재생할 노래가 없습니다.");
+      {% endif %}
+  }
 
-    // 플레이리스트에 노래 추가 요청
-    function addSongToPlaylist(playlistId, songId) {
-        fetch(`/add_song_to_playlist/${playlistId}/${songId}`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('playlist-modal').style.display = 'none';
-                showAlert('success', '플레이리스트에 노래가 추가되었습니다.');
-            } else {
-                showAlert('danger', data.message || '오류가 발생했습니다.');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showAlert('danger', '오류가 발생했습니다.');
-        });
-    }
+  function openPlaylistModal(songId) {
+      currentSongId = songId;
+      playlistModal.style.display = 'block';
+  }
 
-    // 노래 재생 기능
-    function playSong(songId, embedUrl, songTitle) {
-        document.getElementById('player-song-title').textContent = songTitle;
-        document.getElementById('youtube-player').src = embedUrl + '?autoplay=1';
-        document.getElementById('player-modal').style.display = 'block';
-    }
+  // 모든 닫기 버튼에 이벤트 리스너 추가
+  closeModalButtons.forEach(function(button) {
+      button.addEventListener('click', function() {
+          playlistModal.style.display = 'none';
+          playerModal.style.display = 'none';
+          youtubePlayer.src = '';  // 플레이어 중지
+      });
+  });
 
-    // 앨범 재생 기능
-    function playAlbum(youtubeUrl, albumTitle) {
-        let embedUrl = youtubeUrl;
-        
-        // YouTube URL을 임베드 URL로 변환
-        if (youtubeUrl.includes('youtube.com/watch?v=')) {
-            // 일반 동영상 URL을 임베드 URL로 변환
-            const videoId = youtubeUrl.split('v=')[1].split('&')[0];
-            embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        } else if (youtubeUrl.includes('youtube.com/playlist?list=')) {
-            // 플레이리스트 URL을 임베드 URL로 변환
-            const listId = youtubeUrl.split('list=')[1].split('&')[0];
-            embedUrl = `https://www.youtube.com/embed/videoseries?list=${listId}`;
-        } else if (youtubeUrl.includes('youtu.be/')) {
-            // 단축 URL을 임베드 URL로 변환
-            const videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
-            embedUrl = `https://www.youtube.com/embed/${videoId}`;
-        }
-        
-        playerSongTitle.textContent = `${albumTitle} - 전체 앨범`;
-        youtubePlayer.src = embedUrl + '?autoplay=1';
-        playerModal.style.display = 'block';
-    }
+  // 모달 바깥 클릭시 닫힘
+  window.addEventListener('click', function(event) {
+      if (event.target === playlistModal) {
+          playlistModal.style.display = 'none';
+      }
+      if (event.target === playerModal) {
+          playerModal.style.display = 'none';
+          youtubePlayer.src = '';  // 플레이어 중지
+      }
+  });
 
-    // 알림 표시 기능
-    function showAlert(type, message) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type}`;
-        alertDiv.textContent = message;
-        
-        const container = document.querySelector('.flash-messages');
-        container.appendChild(alertDiv);
-        
-        // 5초 후 알림 제거
-        setTimeout(function() {
-            alertDiv.style.opacity = '0';
-            alertDiv.style.transition = 'opacity 0.5s';
-            setTimeout(function() {
-                alertDiv.remove();
-            }, 500);
-        }, 5000);
-    }
+  // 플레이리스트 선택 시
+  document.querySelectorAll('.add-to-playlist-btn').forEach(function(button) {
+      button.addEventListener('click', function() {
+          const playlistId = this.getAttribute('data-playlist-id');
+          addSongToPlaylist(playlistId, currentSongId);
+      });
+  });
 
-    // 리뷰 수정 폼 표시
-    function showEditReviewForm(reviewId) {
-        document.getElementById(`edit-form-${reviewId}`).style.display = 'block';
-    }
-    
-    // 리뷰 수정 폼 숨기기
-    function hideEditReviewForm(reviewId) {
-        document.getElementById(`edit-form-${reviewId}`).style.display = 'none';
-    }
-    
-    // 별점 선택 스타일링 (새 리뷰)
-    document.querySelectorAll('.rating-options input[type="radio"]').forEach(function(radio) {
-        radio.addEventListener('change', function() {
-            const id = this.id;
-            const value = this.value;
-            const labels = document.querySelectorAll('.rating-options label');
-            
-            labels.forEach(function(label) {
-                if (label.getAttribute('for') === id) {
-                    label.style.color = 'var(--hotpot-orange)';
-                } else {
-                    label.style.color = '#ccc';
-                }
-            });
-        });
-    });
-    
-    // 앨범 삭제 확인
-    function confirmDeleteAlbum(albumId) {
-        if (confirm('정말로 이 앨범을 삭제하시겠습니까? 모든 곡과 리뷰가 함께 삭제됩니다.')) {
-            window.location.href = `/delete_album/${albumId}`;
-        }
-    }
-    
-    // 노래 삭제 확인
-    function confirmDeleteSong(songId) {
-        if (confirm('정말로 이 노래를 삭제하시겠습니까?')) {
-            window.location.href = `/delete_song/${songId}`;
-        }
-    }
+  // 전역 함수
+  function showPlaylistModal(songId) {
+      currentSongId = songId;
+      document.getElementById('playlist-modal').style.display = 'block';
+  }
+
+  // 플레이리스트에 노래 추가 요청
+  function addSongToPlaylist(playlistId, songId) {
+      fetch(`/add_song_to_playlist/${playlistId}/${songId}`, {
+          method: 'POST'
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              document.getElementById('playlist-modal').style.display = 'none';
+              showAlert('success', '플레이리스트에 노래가 추가되었습니다.');
+          } else {
+              showAlert('danger', data.message || '오류가 발생했습니다.');
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          showAlert('danger', '오류가 발생했습니다.');
+      });
+  }
+
+  // 노래 재생 기능
+  function playSong(songId, embedUrl, songTitle) {
+      document.getElementById('player-song-title').textContent = songTitle;
+      document.getElementById('youtube-player').src = embedUrl + '?autoplay=1';
+      document.getElementById('player-modal').style.display = 'block';
+  }
+
+  // 앨범 재생 기능
+  function playAlbum(youtubeUrl, albumTitle) {
+      let embedUrl = youtubeUrl;
+
+      // YouTube URL을 임베드 URL로 변환
+      if (youtubeUrl.includes('youtube.com/watch?v=')) {
+          // 일반 동영상 URL을 임베드 URL로 변환
+          const videoId = youtubeUrl.split('v=')[1].split('&')[0];
+          embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      } else if (youtubeUrl.includes('youtube.com/playlist?list=')) {
+          // 플레이리스트 URL을 임베드 URL로 변환
+          const listId = youtubeUrl.split('list=')[1].split('&')[0];
+          embedUrl = `https://www.youtube.com/embed/videoseries?list=${listId}`;
+      } else if (youtubeUrl.includes('youtu.be/')) {
+          // 단축 URL을 임베드 URL로 변환
+          const videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
+          embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      }
+
+      playerSongTitle.textContent = `${albumTitle} - 전체 앨범`;
+      youtubePlayer.src = embedUrl + '?autoplay=1';
+      playerModal.style.display = 'block';
+  }
+
+  // 알림 표시 기능
+  function showAlert(type, message) {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.textContent = message;
+
+      const container = document.querySelector('.flash-messages');
+      container.appendChild(alertDiv);
+
+      // 5초 후 알림 제거
+      setTimeout(function() {
+          alertDiv.style.opacity = '0';
+          alertDiv.style.transition = 'opacity 0.5s';
+          setTimeout(function() {
+              alertDiv.remove();
+          }, 500);
+      }, 5000);
+  }
+
+  // 리뷰 수정 폼 표시
+  function showEditReviewForm(reviewId) {
+      document.getElementById(`edit-form-${reviewId}`).style.display = 'block';
+  }
+
+  // 리뷰 수정 폼 숨기기
+  function hideEditReviewForm(reviewId) {
+      document.getElementById(`edit-form-${reviewId}`).style.display = 'none';
+  }
+
+  // 별점 선택 스타일링 (새 리뷰)
+  document.querySelectorAll('.rating-options input[type="radio"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+          const id = this.id;
+          const value = this.value;
+          const labels = document.querySelectorAll('.rating-options label');
+
+          labels.forEach(function(label) {
+              if (label.getAttribute('for') === id) {
+                  label.style.color = 'var(--hotpot-orange)';
+              } else {
+                  label.style.color = '#ccc';
+              }
+          });
+      });
+  });
+
+  // 앨범 삭제 확인
+  function confirmDeleteAlbum(albumId) {
+      if (confirm('정말로 이 앨범을 삭제하시겠습니까? 모든 곡과 리뷰가 함께 삭제됩니다.')) {
+          window.location.href = `/delete_album/${albumId}`;
+      }
+  }
+
+  // 노래 삭제 확인
+  function confirmDeleteSong(songId) {
+      if (confirm('정말로 이 노래를 삭제하시겠습니까?')) {
+          window.location.href = `/delete_song/${songId}`;
+      }
+  }
 </script>
-{% endblock %} 
+{% endblock %}
