@@ -226,7 +226,8 @@ def add_album():
                 title=track['title'],
                 duration=track['duration'],
                 track_number=idx,
-                album_id=album.id
+                album_id=album.id,
+                lastfm_url=track.get('url')
             )
             db.session.add(song)
         
@@ -317,6 +318,7 @@ def add_song(album_id):
         title = request.form.get('title')
         track_number = request.form.get('track_number')
         duration = request.form.get('duration')
+        url = request.form.get('url')
         
         if not title:
             flash('노래 제목을 입력해주세요.', 'danger')
@@ -326,7 +328,8 @@ def add_song(album_id):
             title=title,
             track_number=track_number,
             duration=duration,
-            album_id=album_id
+            album_id=album_id,
+            lastfm_url = url
         )
         
         db.session.add(song)

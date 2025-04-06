@@ -192,7 +192,8 @@ def seed_database():
                             title=clean_text(track["title"]),  # 제목 정제
                             duration=track["duration"],
                             track_number=track.get("rank", 1),
-                            album_id=new_album.id
+                            album_id=new_album.id,
+                            lastfm_url=track["url"]
                         )
                         db.session.add(song)
 
@@ -281,7 +282,8 @@ def seed_database():
                             title=clean_text(track["title"]),  # 제목 정제
                             duration=track["duration"],
                             track_number=track.get("rank", 1),
-                            album_id=new_album.id
+                            album_id=new_album.id,
+                            lastfm_url=track['url']
                         )
                         db.session.add(song)
 
@@ -315,7 +317,7 @@ def seed_database():
         )
         
         db.session.add(hip_hop_playlist)
-        db.session.add(kpop_playlist)
+        #db.session.add(kpop_playlist)
         db.session.commit()
         
         print("\nDatabase seeding completed successfully!")

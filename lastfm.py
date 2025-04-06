@@ -190,11 +190,13 @@ def get_chart_recommended_albums(limit=8):
         db.session.flush()  # ID 확보용
 
         for idx, track in enumerate(album_info.get("tracks", []), start=1):
+            print(">> 저장할 url:", track["url"])
             song = Song(
                 title=track["title"],
                 duration=track["duration"],
                 track_number=idx,
-                album_id=new_album.id
+                album_id=new_album.id,
+                lastfm_url=track["url"]
             )
             db.session.add(song)
 
