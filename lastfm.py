@@ -47,9 +47,7 @@ def get_album_info(mbid=None, album_title=None, artist_name=None):
         params["album"] = album_title
         params["artist"] = artist_name
     else:
-        print("if문 패스 실패....", album_title)
         return None
-    print("if문 패스 성공", album_title)
     res = requests.get(BASE_URL, params=params, headers=HEADERS)
     data = res.json()
     album_info = data.get("album", {})
@@ -68,14 +66,12 @@ def get_album_info(mbid=None, album_title=None, artist_name=None):
         minutes = duration // 60
         seconds = duration % 60
         formatted_duration = f"{minutes}:{seconds:02d}"
-        print("for 진입 성공")
         tracks.append({
             "title": track.get("name"),
             "duration": formatted_duration,
             "url": track.get("url"),
             "rank": track.get("@attr", {}).get("rank")
         })
-    print("track append 성공")
     return {
         "title": album_info.get("name"),
         "artist": album_info.get("artist"),
@@ -84,7 +80,7 @@ def get_album_info(mbid=None, album_title=None, artist_name=None):
         "tags": [tag.get("name") for tag in album_info.get("tags", {}).get("tag", [])]
     }
 
-def get_chart_recommended_albums(limit=8):
+def get_chart_recommended_albums(limit=10):
     top_artists = get_top_artists(limit=limit)
     saved_albums = []
 
@@ -98,7 +94,6 @@ def get_chart_recommended_albums(limit=8):
         artist_name = album_data.get("artist", {}).get("name") or artist["name"]
         mbid = album_data.get("mbid")
 
-        print("album 처음: ", album_data)
 
         # 이미 같은 제목과 아티스트의 앨범이 있는지 확인
         existing = Album.query.filter_by(title=title, artist=artist_name).first()
@@ -123,12 +118,14 @@ def get_chart_recommended_albums(limit=8):
         db.session.flush()  # ID 확보용
 
         for idx, track in enumerate(album_info.get("tracks", []), start=1):
+            print(">> 저장할 youtube_url:", track.get("url"))
+
             song = Song(
                 title=track["title"],
                 duration=track["duration"],
                 track_number=track.get("rank") or idx,
                 album_id=new_album.id,
-                lastfm_url=track["url"] 
+                youtube_url=track["url"] 
             )
             db.session.add(song)
 

@@ -895,6 +895,11 @@
 
   // 노래 재생 기능
   function playSong(songId, embedUrl, songTitle) {
+      // Last.fm URL이라면 iframe 대신 새 탭으로 열기
+      if (embedUrl.includes("last.fm")) {
+        window.open(embedUrl, '_blank');
+        return;
+      }
       document.getElementById('player-song-title').textContent = songTitle;
       document.getElementById('youtube-player').src = embedUrl + '?autoplay=1';
       document.getElementById('player-modal').style.display = 'block';

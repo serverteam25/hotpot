@@ -867,4 +867,8 @@ def delete_review(review_id):
     return redirect(url_for('album_detail', album_id=album_id))
 
 if __name__ == '__main__':
+    with app.app_context():
+        if Album.query.count() == 0:
+            print("초기 앨범 데이터 수집 중...")
+            get_chart_recommended_albums()  
     app.run(debug=True, port=5002) 
