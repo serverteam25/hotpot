@@ -1,18 +1,95 @@
 {% extends 'base.html' %}
 
-{% block title %}앨범 이상형 월드컵 우승자 - Hotpot Music{% endblock %}
+{% block title %}우승자 - {{ winner.title }}{% endblock %}
+
+{% block head %}
+<style>
+.winner-container {
+    text-align: center;
+    padding: 2rem;
+    animation: fadeIn 1s ease-in;
+}
+
+.winner-title {
+    font-size: 2.5rem;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    margin-bottom: 2rem;
+}
+
+.winner-album {
+    position: relative;
+    display: inline-block;
+    margin: 2rem 0;
+}
+
+.winner-album img {
+    max-width: 300px;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(255,215,0,0.5);
+    animation: pulse 2s infinite;
+}
+
+.confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    background-color: #f0f;
+    animation: confetti-fall 3s linear infinite;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes confetti-fall {
+    0% { transform: translateY(-100vh) rotate(0deg); }
+    100% { transform: translateY(100vh) rotate(360deg); }
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4 text-center">
-    <h2>앨범 이상형 월드컵 우승자!</h2>
-    <div class="card mx-auto mt-4" style="max-width: 400px;">
-        <img src="{{ winner.cover_image }}" class="card-img-top" alt="{{ winner.title }}">
-        <div class="card-body">
-            <h3 class="card-title">{{ winner.title }}</h3>
-            <p class="card-text text-muted">{{ winner.artist }}</p>
-            <a href="{{ url_for('album_detail', album_id=winner.id) }}" class="btn btn-primary">앨범 상세 보기</a>
-            <a href="{{ url_for('worldcup') }}" class="btn btn-outline-secondary">다시 하기</a>
-        </div>
+<div class="winner-container">
+    <h1 class="winner-title">🏆 우승자 발표 🏆</h1>
+    
+    <div class="winner-album">
+        <img src="{{ winner.cover_image }}" alt="{{ winner.title }}" class="img-fluid">
+    </div>
+    
+    <h2 class="mt-4">{{ winner.title }}</h2>
+    <h3 class="text-muted">{{ winner.artist }}</h3>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('album_detail', album_id=winner.id) }}" class="btn btn-primary">앨범 상세정보</a>
+        <a href="{{ url_for('worldcup') }}" class="btn btn-secondary">다시 하기</a>
     </div>
 </div>
+
+<script>
+// 색종이 효과 생성
+function createConfetti() {
+    const colors = ['#FFD700', '#FF69B4', '#4169E1', '#32CD32', '#FF4500'];
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.style.left = Math.random() * 100 + 'vw';
+    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+    document.body.appendChild(confetti);
+    
+    setTimeout(() => {
+        confetti.remove();
+    }, 5000);
+}
+
+// 주기적으로 색종이 생성
+setInterval(createConfetti, 100);
+</script>
 {% endblock %} 

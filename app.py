@@ -33,10 +33,13 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# 데이터베이스 생성
-@app.before_first_request
-def create_tables():
+# 데이터베이스 초기화 함수
+def init_db():
     db.create_all()
+
+# Flask 2.3.x에서는 before_first_request 대신 with app.app_context() 사용
+with app.app_context():
+    init_db()
 
 # 홈 페이지
 @app.route('/')
@@ -847,16 +850,34 @@ def worldcup():
         genre = request.form.get('genre')
         round_size = int(request.form.get('round_size', 16))
         
-        # 장르별 앨범 랜덤 선택
+        # 장르별 앨범 필터링 (대소문자 구분 없이)
         if genre == 'hiphop':
-            albums = Album.query.filter(Album.genre.like('%hip%') | Album.genre.like('%rap%')).all()
+            albums = Album.query.filter(
+                or_(
+                    Album.genre.ilike('%hip%'),
+                    Album.genre.ilike('%rap%'),
+                    Album.genre.ilike('%힙합%')
+                )
+            ).distinct().all()
         elif genre == 'kpop':
-            albums = Album.query.filter(Album.genre.like('%k-pop%') | Album.genre.like('%kpop%')).all()
+            albums = Album.query.filter(
+                or_(
+                    Album.genre.ilike('%k-pop%'),
+                    Album.genre.ilike('%kpop%'),
+                    Album.genre.ilike('%케이팝%')
+                )
+            ).distinct().all()
         else:
             albums = []
+
+        if len(albums) < round_size:
+            flash(f'선택한 장르의 앨범이 {round_size}개보다 적습니다. 더 많은 앨범을 추가해주세요.', 'warning')
+            return redirect(url_for('worldcup'))
         
-        # 랜덤으로 앨범 선택
-        selected_albums = random.sample(albums, min(round_size, len(albums)))
+        # 중복 제거 후 랜덤 선택
+        unique_albums = list(set(albums))  # 중복 제거
+        random.shuffle(unique_albums)  # 랜덤하게 섞기
+        selected_albums = unique_albums[:round_size]  # 필요한 만큼만 선택
         
         # 세션에 게임 정보 저장
         session['worldcup'] = {
@@ -864,7 +885,8 @@ def worldcup():
             'round_size': round_size,
             'albums': [album.id for album in selected_albums],
             'current_round': 1,
-            'winners': []
+            'winners': [],
+            'current_match': 0
         }
         
         return redirect(url_for('worldcup_round'))
@@ -877,39 +899,71 @@ def worldcup_round():
         return redirect(url_for('worldcup'))
     
     game = session['worldcup']
-    albums = game['albums']
+    current_albums = game['albums']
+    current_round = game['current_round']
     
     if request.method == 'POST':
-        winner_id = int(request.form.get('winner'))
-        game['winners'].append(winner_id)
-        game['albums'].remove(winner_id)
+        winner_id = request.form.get('winner')
+        game['winners'].append(int(winner_id))
         
-        # 현재 라운드의 모든 매치가 끝났는지 확인
-        if len(game['albums']) == 0:
-            if len(game['winners']) == 1:
-                # 우승자 결정
+        # 현재 라운드의 모든 매치가 완료되었는지 확인
+        if len(game['winners']) == len(current_albums) // 2:
+            # 결승전이 끝났는지 확인
+            if len(current_albums) == 2:
                 winner = Album.query.get(game['winners'][0])
+                session.pop('worldcup', None)
                 return render_template('worldcup_winner.html', winner=winner)
             
             # 다음 라운드 준비
             game['albums'] = game['winners']
             game['winners'] = []
             game['current_round'] += 1
+            game['current_match'] = 0
+            session['worldcup'] = game
+            return redirect(url_for('worldcup_round'))
         
+        # 다음 매치로 이동
+        if 'current_match' not in game:
+            game['current_match'] = 0
+        game['current_match'] += 1
         session['worldcup'] = game
     
-    # 현재 라운드의 두 앨범 선택
-    if len(albums) < 2:
-        return redirect(url_for('worldcup_winner'))
+    # 현재 매치의 두 앨범 선택
+    if 'current_match' not in game:
+        game['current_match'] = 0
+        session['worldcup'] = game
     
-    album1 = Album.query.get(albums[0])
-    album2 = Album.query.get(albums[1])
+    match_index = game['current_match'] * 2
     
-    return render_template('worldcup_round.html', 
-                         album1=album1, 
+    # 매치 인덱스가 유효한지 확인
+    if match_index >= len(current_albums) or match_index + 1 >= len(current_albums):
+        # 현재 라운드의 모든 매치가 완료된 경우
+        if len(game['winners']) > 0:
+            # 다음 라운드로 진행
+            game['albums'] = game['winners']
+            game['winners'] = []
+            game['current_round'] += 1
+            game['current_match'] = 0
+            session['worldcup'] = game
+            return redirect(url_for('worldcup_round'))
+        else:
+            # 비정상적인 상태이므로 처음부터 다시 시작
+            return redirect(url_for('worldcup'))
+    
+    album1 = Album.query.get(current_albums[match_index])
+    album2 = Album.query.get(current_albums[match_index + 1])
+    
+    total_rounds = math.ceil(math.log2(game['round_size']))
+    matches_in_round = len(current_albums) // 2
+    current_match = game['current_match'] + 1
+    
+    return render_template('worldcup_round.html',
+                         album1=album1,
                          album2=album2,
-                         current_round=game['current_round'],
-                         total_rounds=math.ceil(math.log2(game['round_size'])))
+                         current_round=current_round,
+                         total_rounds=total_rounds,
+                         current_match=current_match,
+                         matches_in_round=matches_in_round)
 
 @app.route('/worldcup/winner')
 def worldcup_winner():

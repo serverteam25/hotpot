@@ -31,7 +31,7 @@ class Album(db.Model):
     title = db.Column(db.String(100), nullable=False)
     artist = db.Column(db.String(100), nullable=False)
     release_date = db.Column(db.Date)
-    genre = db.Column(db.String(50))
+    genre = db.Column(db.String(255))
     cover_image = db.Column(db.String(500))
     youtube_url = db.Column(db.String(500))  # 앨범 유튜브 URL
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -93,7 +93,7 @@ class Album(db.Model):
 
 class Song(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
     duration = db.Column(db.String(10))  # 문자열 형식의 재생 시간 (예: "3:45")
     track_number = db.Column(db.Integer)
     youtube_url = db.Column(db.String(500))  # 유튜브 영상 URL

@@ -3,6 +3,15 @@ from models import User, Album, Song, Review, Playlist, PlaylistSong
 from werkzeug.security import generate_password_hash
 from datetime import datetime, date
 import lastfm
+import time
+from lastfm import get_top_album, get_album_info
+import requests
+import re
+
+def clean_text(text):
+    """이모지와 특수 문자를 제거하고 기본 ASCII 문자만 남깁니다."""
+    # ASCII 문자, 숫자, 기본 문장 부호만 허용
+    return re.sub(r'[^\x00-\x7F]+', '', text)
 
 def create_album_from_data(album_data):
     """Last.fm API에서 받은 앨범 데이터로 Album 객체 생성"""
@@ -42,117 +51,274 @@ def create_album_from_data(album_data):
     return album
 
 def seed_database():
+    """데이터베이스를 초기화하고 초기 데이터를 추가합니다."""
+    
+    print("Dropping all tables...")
     with app.app_context():
-        # 테스트 유저가 이미 존재하는지 확인
-        test_user = User.query.filter_by(username="testuser").first()
-        if not test_user:
-            # 테스트 유저 생성
-            test_user = User(
-                username="testuser",
-                email="test@example.com",
-                password_hash=generate_password_hash("password123")
-            )
-            db.session.add(test_user)
-            db.session.flush()
-        
-        # Last.fm API를 통해 앨범 데이터 가져오기
-        print("Last.fm에서 앨범 데이터를 가져오는 중...")
-        
-        # 힙합 아티스트 목록
-        hiphop_artists = [
-            "Kendrick Lamar", "J. Cole", "Drake", "Travis Scott", "Kanye West",
-            "Jay-Z", "Nas", "Eminem", "Tyler, The Creator", "Childish Gambino",
-            "A$AP Rocky", "Mac Miller", "Post Malone", "Lil Baby", "21 Savage",
-            "Future", "Migos", "Lil Uzi Vert", "Playboi Carti", "Young Thug",
-            "Metro Boomin", "Tyler, The Creator"
+        db.drop_all()
+        db.create_all()
+        print("Tables recreated successfully")
+
+        # 테스트 유저 생성
+        test_user = User(
+            username="testuser",
+            email="test@example.com",
+            password_hash=generate_password_hash("password123", method='sha256')
+        )
+        db.session.add(test_user)
+        db.session.commit()
+        print("Test user created")
+
+        # 모든 정규 앨범을 가져올 메인 아티스트
+        main_artists = [
+            'Kanye West', 'Tyler, The Creator', 'Playboi Carti', 
+            'JPEGMAFIA', 'Cordae', 'Drake', 'Kendrick Lamar',
+            'J. Cole', 'Travis Scott', 'Frank Ocean', 'The Weeknd',
+            'Aminé', 'IDK', 'SZA', 'Daniel Caesar'
         ]
         
-        # R&B 아티스트 목록
-        rnb_artists = [
-            "Frank Ocean", "The Weeknd", "SZA", "Daniel Caesar", "H.E.R.",
-            "Alicia Keys", "John Legend", "Usher", "Chris Brown", "Beyoncé",
-            "Rihanna", "Bruno Mars", "Anderson .Paak", "D'Angelo", "Erykah Badu",
-            "Lauryn Hill", "Jhené Aiko", "Summer Walker", "Kehlani", "Teyana Taylor"
+        # Top 5 앨범만 가져올 아티스트
+        kpop_artists = [
+            # 5세대 그룹
+            'BABYMONSTER', 'ILLIT', 
+           'KISS OF LIFE',  
+            'NewJeans', 'LE SSERAFIM', 'IVE', 'NMIXX', 
+            'tripleS',
+            
+            # 4세대 그룹
+            'BLACKPINK', 'TWICE', 'Red Velvet', 'aespa', 'ITZY', 
+            'STAYC', '(G)I-DLE', 'fromis_9',
+            
+            
+            # 3세대 그룹
+            'OH MY GIRL',  'GFRIEND', 'LOONA'
+   
+            
+        
         ]
-        
-        # K-pop 여자 그룹 목록
-        kpop_girl_groups = [
-            "BLACKPINK", "TWICE", "Red Velvet", "NewJeans", "LE SSERAFIM",
-            "IVE", "aespa", "ITZY", "STAYC", "NMIXX",
-            "Girls' Generation", "2NE1", "MAMAMOO", "GFRIEND", "Apink",
-            "EXID", "Dreamcatcher", "LOONA", "WJSN", "fromis_9"
+
+        # 정규 앨범 필터링을 위한 키워드
+        exclude_keywords = [
+            'single', 'ep', 'remix', 'live', 'demo', 'instrumental',
+            'compilation', 'complete', 'collection', 'best of', 'greatest hits',
+            'deluxe', 'special', 'edition', 'remaster', 'remastered',
+            'mixtape', 'mix tape', 'soundtrack', 'ost', 'cover',
+            'acoustic', 'unplugged', 'session', 'bootleg',
+            'clean', 'explicit', 'clean version', 'explicit version',
+            'karaoke', 'instrumental version', 'inst.',
+            'japanese', 'chinese', 'korean', 'international',
+            'repackage', 'repacked', 'bonus', 'exclusive',
+            'feat.', 'ft.', '&',
+            '(cd', '(lp', '(digital', '(vinyl',
+            'version', 'ver.', ' ver'
         ]
-        
-        all_albums = []
-        
-        # 힙합 앨범 가져오기
-        for artist in hiphop_artists:
-            print(f"{artist}의 앨범을 가져오는 중...")
-            album_data = lastfm.get_top_album(artist)
-            if album_data:
-                album = create_album_from_data(album_data)
-                if album:
-                    all_albums.append(album)
-        
-        # R&B 앨범 가져오기
-        for artist in rnb_artists:
-            print(f"{artist}의 앨범을 가져오는 중...")
-            album_data = lastfm.get_top_album(artist)
-            if album_data:
-                album = create_album_from_data(album_data)
-                if album:
-                    all_albums.append(album)
-        
-        # K-pop 앨범 가져오기
-        for group in kpop_girl_groups:
-            print(f"{group}의 앨범을 가져오는 중...")
-            album_data = lastfm.get_top_album(group)
-            if album_data:
-                album = create_album_from_data(album_data)
-                if album:
-                    all_albums.append(album)
-        
-        print(f"총 {len(all_albums)}개의 앨범이 추가되었습니다.")
-        
-        # 테스트 리뷰 추가
-        for album in all_albums:
-            review = Review(
-                rating=4,
-                comment="테스트 리뷰입니다.",
-                user_id=test_user.id,
-                album_id=album.id
-            )
-            db.session.add(review)
-        
-        # 힙합/R&B 플레이리스트 생성
-        hiphop_rnb_playlist = Playlist(
+
+        print("\nProcessing main artists (up to 10 albums)...")
+        # 메인 아티스트들의 앨범 가져오기 (최대 10개)
+        for artist_name in main_artists:
+            print(f"\nProcessing {artist_name}...")
+            
+            params = {
+                'method': 'artist.getTopAlbums',
+                'artist': artist_name,
+                'api_key': lastfm.LASTFM_API_KEY,
+                'format': 'json',
+                'limit': 50  # 필터링을 위해 여유있게 가져오기
+            }
+            
+            try:
+                response = requests.get(lastfm.BASE_URL, params=params)
+                response.raise_for_status()
+                data = response.json()
+                
+                if 'topalbums' not in data or 'album' not in data['topalbums']:
+                    print(f"No albums found for {artist_name}")
+                    continue
+                
+                albums = data['topalbums']['album']
+                added_count = 0
+                
+                for album_data in albums:
+                    if added_count >= 10:  # 10개 앨범만 추가
+                        break
+                        
+                    title = album_data.get("name")
+                    
+                    # 제외할 키워드가 포함된 앨범 건너뛰기
+                    should_exclude = False
+                    title_lower = title.lower()
+                    
+                    for keyword in exclude_keywords:
+                        if keyword.lower() in title_lower:
+                            should_exclude = True
+                            break
+                    
+                    if should_exclude:
+                        continue
+                        
+                    artist_name = album_data.get("artist", {}).get("name") or artist_name
+                    mbid = album_data.get("mbid")
+
+                    # 이미 존재하는 앨범인지 확인
+                    existing = Album.query.filter_by(title=title, artist=artist_name).first()
+                    if existing:
+                        print(f"Album {title} by {artist_name} already exists")
+                        continue
+
+                    # 앨범 상세 정보 가져오기
+                    album_info = get_album_info(mbid=mbid, album_title=title, artist_name=artist_name)
+                    if not album_info:
+                        print(f"Could not fetch album info for {title}")
+                        continue
+                    
+                    # 트랙이 3개 미만인 앨범 건너뛰기
+                    if len(album_info.get("tracks", [])) < 3:
+                        print(f"Skipping {title} - less than 3 tracks")
+                        continue
+                    
+                    # 새 앨범 생성
+                    new_album = Album(
+                        title=album_info["title"],
+                        artist=album_info["artist"],
+                        genre=", ".join(album_info.get("tags", [])[:2]),
+                        cover_image=album_info.get("cover_image")
+                    )
+                    db.session.add(new_album)
+                    db.session.flush()
+
+                    # 트랙 추가
+                    for track in album_info.get("tracks", []):
+                        song = Song(
+                            title=clean_text(track["title"]),  # 제목 정제
+                            duration=track["duration"],
+                            track_number=track.get("rank", 1),
+                            album_id=new_album.id
+                        )
+                        db.session.add(song)
+
+                    # 테스트 리뷰 추가
+                    test_review = Review(
+                        rating=5,
+                        comment=f"Great album by {artist_name}!",
+                        user_id=test_user.id,
+                        album_id=new_album.id
+                    )
+                    db.session.add(test_review)
+                    
+                    db.session.commit()
+                    added_count += 1
+                    print(f"Added album {added_count}/10: {title} by {artist_name}")
+                
+                time.sleep(1)  # API 호출 간격 조절
+                
+            except Exception as e:
+                print(f"Error processing {artist_name}: {str(e)}")
+                continue
+
+        print("\nProcessing K-pop artists (top 5 albums)...")
+        # K-pop 아티스트들의 top 5 앨범 가져오기
+        for artist_name in kpop_artists:
+            print(f"\nProcessing {artist_name}...")
+            
+            params = {
+                'method': 'artist.getTopAlbums',
+                'artist': artist_name,
+                'api_key': lastfm.LASTFM_API_KEY,
+                'format': 'json',
+                'limit': 10
+            }
+            
+            try:
+                response = requests.get(lastfm.BASE_URL, params=params)
+                response.raise_for_status()
+                data = response.json()
+                
+                if 'topalbums' not in data or 'album' not in data['topalbums']:
+                    print(f"No albums found for {artist_name}")
+                    continue
+                
+                albums = data['topalbums']['album']
+                added_count = 0
+                
+                for album_data in albums:
+                    if added_count >= 5:  # 5개 앨범만 추가
+                        break
+                        
+                    title = album_data.get("name")
+                    artist_name = album_data.get("artist", {}).get("name") or artist_name
+                    mbid = album_data.get("mbid")
+
+                    # 이미 존재하는 앨범인지 확인
+                    existing = Album.query.filter_by(title=title, artist=artist_name).first()
+                    if existing:
+                        print(f"Album {title} by {artist_name} already exists")
+                        continue
+
+                    # 앨범 상세 정보 가져오기
+                    album_info = get_album_info(mbid=mbid, album_title=title, artist_name=artist_name)
+                    if not album_info:
+                        print(f"Could not fetch album info for {title}")
+                        continue
+                    
+                    # 트랙이 3개 미만인 앨범 건너뛰기
+                    if len(album_info.get("tracks", [])) < 3:
+                        print(f"Skipping {title} - less than 3 tracks")
+                        continue
+                    
+                    # 새 앨범 생성
+                    new_album = Album(
+                        title=album_info["title"],
+                        artist=album_info["artist"],
+                        genre=", ".join(album_info.get("tags", [])[:2]),
+                        cover_image=album_info.get("cover_image")
+                    )
+                    db.session.add(new_album)
+                    db.session.flush()
+
+                    # 트랙 추가
+                    for track in album_info.get("tracks", []):
+                        song = Song(
+                            title=clean_text(track["title"]),  # 제목 정제
+                            duration=track["duration"],
+                            track_number=track.get("rank", 1),
+                            album_id=new_album.id
+                        )
+                        db.session.add(song)
+
+                    # 테스트 리뷰 추가
+                    test_review = Review(
+                        rating=5,
+                        comment=f"Great album by {artist_name}!",
+                        user_id=test_user.id,
+                        album_id=new_album.id
+                    )
+                    db.session.add(test_review)
+                    
+                    db.session.commit()
+                    added_count += 1
+                    print(f"Added album {added_count}/5: {title} by {artist_name}")
+                
+                time.sleep(1)  # API 호출 간격 조절
+                
+            except Exception as e:
+                print(f"Error processing {artist_name}: {str(e)}")
+                continue
+
+        # 플레이리스트 생성
+        hip_hop_playlist = Playlist(
             name="힙합/R&B 플레이리스트",
-            description="인기 힙합과 R&B 곡들을 모았습니다.",
             user_id=test_user.id
         )
-        db.session.add(hiphop_rnb_playlist)
-        db.session.flush()
-        
-        # K-pop 플레이리스트 생성
         kpop_playlist = Playlist(
             name="K-pop 플레이리스트",
-            description="인기 K-pop 곡들을 모았습니다.",
             user_id=test_user.id
         )
+        
+        db.session.add(hip_hop_playlist)
         db.session.add(kpop_playlist)
-        db.session.flush()
-        
-        # 플레이리스트에 노래 추가
-        for album in all_albums:
-            for song in album.songs:
-                playlist_song = PlaylistSong(
-                    playlist_id=hiphop_rnb_playlist.id if album.genre in ["Hip-Hop", "R&B"] else kpop_playlist.id,
-                    song_id=song.id
-                )
-                db.session.add(playlist_song)
-        
         db.session.commit()
-        print("시드 데이터가 성공적으로 추가되었습니다.")
+        
+        print("\nDatabase seeding completed successfully!")
 
 if __name__ == "__main__":
     seed_database() 
