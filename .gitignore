@@ -28,6 +28,7 @@ instance/
 *.db
 *.sqlite
 *.sqlite3
+*.sql  # 데이터베이스 백업 파일
 
 # 가상환경
 venv/

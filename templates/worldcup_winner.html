@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}앨범 이상형 월드컵 우승자 - Hotpot Music{% endblock %}
+
+{% block content %}
+<div class="container mt-4 text-center">
+    <h2>앨범 이상형 월드컵 우승자!</h2>
+    <div class="card mx-auto mt-4" style="max-width: 400px;">
+        <img src="{{ winner.cover_image }}" class="card-img-top" alt="{{ winner.title }}">
+        <div class="card-body">
+            <h3 class="card-title">{{ winner.title }}</h3>
+            <p class="card-text text-muted">{{ winner.artist }}</p>
+            <a href="{{ url_for('album_detail', album_id=winner.id) }}" class="btn btn-primary">앨범 상세 보기</a>
+            <a href="{{ url_for('worldcup') }}" class="btn btn-outline-secondary">다시 하기</a>
+        </div>
+    </div>
+</div>
+{% endblock %} 

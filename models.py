@@ -97,6 +97,7 @@ class Song(db.Model):
     duration = db.Column(db.String(10))  # 문자열 형식의 재생 시간 (예: "3:45")
     track_number = db.Column(db.Integer)
     youtube_url = db.Column(db.String(500))  # 유튜브 영상 URL
+    lastfm_url = db.Column(db.String(500))  # Last.fm URL
     album_id = db.Column(db.Integer, db.ForeignKey('album.id'), nullable=False)
     playlists = db.relationship('PlaylistSong', back_populates='song')
     
@@ -110,6 +111,7 @@ class Song(db.Model):
             'duration': self.duration,
             'track_number': self.track_number,
             'youtube_url': self.youtube_url,
+            'lastfm_url': self.lastfm_url,
             'album_id': self.album_id,
             'album_title': self.album.title,
             'artist': self.album.artist
