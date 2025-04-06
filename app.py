@@ -17,9 +17,7 @@ import math
 
 app = Flask(__name__)
 app.config.from_object(Config)
-app.config['SECRET_KEY'] = 'hotpot-secret-key-2024'  # 세션을 위한 시크릿 키 설정
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:password@localhost/hotpot'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 # 데이터베이스 초기화
 db.init_app(app)
