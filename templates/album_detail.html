@@ -76,14 +76,15 @@
             >
               <i class="fas fa-plus"></i>
             </button>
-            {% endif %} {% if song.youtube_url %}
+            {% endif %} {% if song.lastfm_url %}
             <button
               class="btn-play"
-              title="재생하기"
-              onclick="playSong({{ song.id }}, '{{ song.youtube_embed_url|safe }}', '{{ song.title|safe }}')"
+              title="Last.fm에서 재생하기"
+              onclick="openLastfm('{{ song.lastfm_url }}')"
             >
               <i class="fas fa-play"></i>
             </button>
+
             {% endif %} {% if current_user.is_authenticated and
             song.album.user_id == current_user.id %}
             <a
@@ -789,199 +790,207 @@
 </style>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-      // 플레이리스트 선택 시 버튼 활성화
-      const playlistSelects = document.querySelectorAll('.playlist-select');
-      const addButtons = document.querySelectorAll('.add-to-playlist-btn');
+    document.addEventListener('DOMContentLoaded', function() {
+        // 플레이리스트 선택 시 버튼 활성화
+        const playlistSelects = document.querySelectorAll('.playlist-select');
+        const addButtons = document.querySelectorAll('.add-to-playlist-btn');
 
-      playlistSelects.forEach((select, index) => {
-          select.addEventListener('change', function() {
-              const button = addButtons[index];
-              const songId = button.dataset.songId;
-              button.disabled = !this.value;
+        playlistSelects.forEach((select, index) => {
+            select.addEventListener('change', function() {
+                const button = addButtons[index];
+                const songId = button.dataset.songId;
+                button.disabled = !this.value;
 
-              // 버튼 클릭 이벤트 설정
-              button.onclick = function() {
-                  const playlistId = select.value;
-                  if (playlistId) {
-                      window.location.href = `/add_to_playlist/${playlistId}/${songId}?redirect_to=album_detail&album_id={{ album.id }}`;
-                  }
-              };
-          });
-      });
-  });
+                // 버튼 클릭 이벤트 설정
+                button.onclick = function() {
+                    const playlistId = select.value;
+                    if (playlistId) {
+                        window.location.href = `/add_to_playlist/${playlistId}/${songId}?redirect_to=album_detail&album_id={{ album.id }}`;
+                    }
+                };
+            });
+        });
+    });
 
-  // 플레이리스트 모달 관련 함수들
-  const playlistModal = document.getElementById('playlist-modal');
-  const playerModal = document.getElementById('player-modal');
-  const closeModalButtons = document.querySelectorAll('.close-modal');
-  let currentSongId = null;
+    // 플레이리스트 모달 관련 함수들
+    const playlistModal = document.getElementById('playlist-modal');
+    const playerModal = document.getElementById('player-modal');
+    const closeModalButtons = document.querySelectorAll('.close-modal');
+    let currentSongId = null;
 
-  // 첫 번째 노래 재생 함수
-  function playFirstSong() {
-      {% if songs and songs|length > 0 %}
-          const firstSong = {{ songs[0].id }};
-          const youtubeUrl = "{{ songs[0].youtube_embed_url|safe }}";
-          const songTitle = "{{ songs[0].title|safe }}";
+    // 첫 번째 노래 재생 함수
+    function playFirstSong() {
+        {% if songs and songs|length > 0 %}
+            const firstSong = {{ songs[0].id }};
+            const youtubeUrl = "{{ songs[0].youtube_embed_url|safe }}";
+            const songTitle = "{{ songs[0].title|safe }}";
 
-          if (youtubeUrl) {
-              playSong(firstSong, youtubeUrl, songTitle);
-          } else {
-              alert("재생 가능한 링크가 없습니다.");
-          }
-      {% else %}
-          alert("재생할 노래가 없습니다.");
-      {% endif %}
-  }
+            if (youtubeUrl) {
+                playSong(firstSong, youtubeUrl, songTitle);
+            } else {
+                alert("재생 가능한 링크가 없습니다.");
+            }
+        {% else %}
+            alert("재생할 노래가 없습니다.");
+        {% endif %}
+    }
 
-  function openPlaylistModal(songId) {
-      currentSongId = songId;
-      playlistModal.style.display = 'block';
-  }
+    function openPlaylistModal(songId) {
+        currentSongId = songId;
+        playlistModal.style.display = 'block';
+    }
 
-  // 모든 닫기 버튼에 이벤트 리스너 추가
-  closeModalButtons.forEach(function(button) {
-      button.addEventListener('click', function() {
-          playlistModal.style.display = 'none';
-          playerModal.style.display = 'none';
-          youtubePlayer.src = '';  // 플레이어 중지
-      });
-  });
+    // 모든 닫기 버튼에 이벤트 리스너 추가
+    closeModalButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            playlistModal.style.display = 'none';
+            playerModal.style.display = 'none';
+            youtubePlayer.src = '';  // 플레이어 중지
+        });
+    });
 
-  // 모달 바깥 클릭시 닫힘
-  window.addEventListener('click', function(event) {
-      if (event.target === playlistModal) {
-          playlistModal.style.display = 'none';
-      }
-      if (event.target === playerModal) {
-          playerModal.style.display = 'none';
-          youtubePlayer.src = '';  // 플레이어 중지
-      }
-  });
+    // 모달 바깥 클릭시 닫힘
+    window.addEventListener('click', function(event) {
+        if (event.target === playlistModal) {
+            playlistModal.style.display = 'none';
+        }
+        if (event.target === playerModal) {
+            playerModal.style.display = 'none';
+            youtubePlayer.src = '';  // 플레이어 중지
+        }
+    });
 
-  // 플레이리스트 선택 시
-  document.querySelectorAll('.add-to-playlist-btn').forEach(function(button) {
-      button.addEventListener('click', function() {
-          const playlistId = this.getAttribute('data-playlist-id');
-          addSongToPlaylist(playlistId, currentSongId);
-      });
-  });
+    // 플레이리스트 선택 시
+    document.querySelectorAll('.add-to-playlist-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const playlistId = this.getAttribute('data-playlist-id');
+            addSongToPlaylist(playlistId, currentSongId);
+        });
+    });
 
-  // 전역 함수
-  function showPlaylistModal(songId) {
-      currentSongId = songId;
-      document.getElementById('playlist-modal').style.display = 'block';
-  }
+    // 전역 함수
+    function showPlaylistModal(songId) {
+        currentSongId = songId;
+        document.getElementById('playlist-modal').style.display = 'block';
+    }
 
-  // 플레이리스트에 노래 추가 요청
-  function addSongToPlaylist(playlistId, songId) {
-      fetch(`/add_song_to_playlist/${playlistId}/${songId}`, {
-          method: 'POST'
-      })
-      .then(response => response.json())
-      .then(data => {
-          if (data.success) {
-              document.getElementById('playlist-modal').style.display = 'none';
-              showAlert('success', '플레이리스트에 노래가 추가되었습니다.');
-          } else {
-              showAlert('danger', data.message || '오류가 발생했습니다.');
-          }
-      })
-      .catch(error => {
-          console.error('Error:', error);
-          showAlert('danger', '오류가 발생했습니다.');
-      });
-  }
+    // 플레이리스트에 노래 추가 요청
+    function addSongToPlaylist(playlistId, songId) {
+        fetch(`/add_song_to_playlist/${playlistId}/${songId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('playlist-modal').style.display = 'none';
+                showAlert('success', '플레이리스트에 노래가 추가되었습니다.');
+            } else {
+                showAlert('danger', data.message || '오류가 발생했습니다.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '오류가 발생했습니다.');
+        });
+    }
 
-  // 노래 재생 기능
-  function playSong(songId, embedUrl, songTitle) {
-      document.getElementById('player-song-title').textContent = songTitle;
-      document.getElementById('youtube-player').src = embedUrl + '?autoplay=1';
-      document.getElementById('player-modal').style.display = 'block';
-  }
-
-  // 앨범 재생 기능
-  function playAlbum(youtubeUrl, albumTitle) {
-      let embedUrl = youtubeUrl;
-
-      // YouTube URL을 임베드 URL로 변환
-      if (youtubeUrl.includes('youtube.com/watch?v=')) {
-          // 일반 동영상 URL을 임베드 URL로 변환
-          const videoId = youtubeUrl.split('v=')[1].split('&')[0];
-          embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      } else if (youtubeUrl.includes('youtube.com/playlist?list=')) {
-          // 플레이리스트 URL을 임베드 URL로 변환
-          const listId = youtubeUrl.split('list=')[1].split('&')[0];
-          embedUrl = `https://www.youtube.com/embed/videoseries?list=${listId}`;
-      } else if (youtubeUrl.includes('youtu.be/')) {
-          // 단축 URL을 임베드 URL로 변환
-          const videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
-          embedUrl = `https://www.youtube.com/embed/${videoId}`;
-      }
-
-      playerSongTitle.textContent = `${albumTitle} - 전체 앨범`;
-      youtubePlayer.src = embedUrl + '?autoplay=1';
-      playerModal.style.display = 'block';
-  }
-
-  // 알림 표시 기능
-  function showAlert(type, message) {
-      const alertDiv = document.createElement('div');
-      alertDiv.className = `alert alert-${type}`;
-      alertDiv.textContent = message;
-
-      const container = document.querySelector('.flash-messages');
-      container.appendChild(alertDiv);
-
-      // 5초 후 알림 제거
-      setTimeout(function() {
-          alertDiv.style.opacity = '0';
-          alertDiv.style.transition = 'opacity 0.5s';
-          setTimeout(function() {
-              alertDiv.remove();
-          }, 500);
-      }, 5000);
-  }
-
-  // 리뷰 수정 폼 표시
-  function showEditReviewForm(reviewId) {
-      document.getElementById(`edit-form-${reviewId}`).style.display = 'block';
-  }
-
-  // 리뷰 수정 폼 숨기기
-  function hideEditReviewForm(reviewId) {
-      document.getElementById(`edit-form-${reviewId}`).style.display = 'none';
-  }
-
-  // 별점 선택 스타일링 (새 리뷰)
-  document.querySelectorAll('.rating-options input[type="radio"]').forEach(function(radio) {
-      radio.addEventListener('change', function() {
-          const id = this.id;
-          const value = this.value;
-          const labels = document.querySelectorAll('.rating-options label');
-
-          labels.forEach(function(label) {
-              if (label.getAttribute('for') === id) {
-                  label.style.color = 'var(--hotpot-orange)';
-              } else {
-                  label.style.color = '#ccc';
-              }
-          });
-      });
-  });
-
-  // 앨범 삭제 확인
-  function confirmDeleteAlbum(albumId) {
-      if (confirm('정말로 이 앨범을 삭제하시겠습니까? 모든 곡과 리뷰가 함께 삭제됩니다.')) {
-          window.location.href = `/delete_album/${albumId}`;
+    function openLastfm(url) {
+      if (url) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+          alert("Last.fm 링크가 없습니다.");
       }
   }
 
-  // 노래 삭제 확인
-  function confirmDeleteSong(songId) {
-      if (confirm('정말로 이 노래를 삭제하시겠습니까?')) {
-          window.location.href = `/delete_song/${songId}`;
-      }
-  }
+    // 노래 재생 기능_youtube할 때 필요했던 함수수
+    function playSong(songId, embedUrl, songTitle) {
+        document.getElementById('player-song-title').textContent = songTitle;
+        document.getElementById('youtube-player').src = embedUrl + '?autoplay=1';
+        document.getElementById('player-modal').style.display = 'block';
+    }
+
+    // 앨범 재생 기능
+    function playAlbum(youtubeUrl, albumTitle) {
+        let embedUrl = youtubeUrl;
+
+        // YouTube URL을 임베드 URL로 변환
+        if (youtubeUrl.includes('youtube.com/watch?v=')) {
+            // 일반 동영상 URL을 임베드 URL로 변환
+            const videoId = youtubeUrl.split('v=')[1].split('&')[0];
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        } else if (youtubeUrl.includes('youtube.com/playlist?list=')) {
+            // 플레이리스트 URL을 임베드 URL로 변환
+            const listId = youtubeUrl.split('list=')[1].split('&')[0];
+            embedUrl = `https://www.youtube.com/embed/videoseries?list=${listId}`;
+        } else if (youtubeUrl.includes('youtu.be/')) {
+            // 단축 URL을 임베드 URL로 변환
+            const videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+        }
+
+        playerSongTitle.textContent = `${albumTitle} - 전체 앨범`;
+        youtubePlayer.src = embedUrl + '?autoplay=1';
+        playerModal.style.display = 'block';
+    }
+
+    // 알림 표시 기능
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type}`;
+        alertDiv.textContent = message;
+
+        const container = document.querySelector('.flash-messages');
+        container.appendChild(alertDiv);
+
+        // 5초 후 알림 제거
+        setTimeout(function() {
+            alertDiv.style.opacity = '0';
+            alertDiv.style.transition = 'opacity 0.5s';
+            setTimeout(function() {
+                alertDiv.remove();
+            }, 500);
+        }, 5000);
+    }
+
+    // 리뷰 수정 폼 표시
+    function showEditReviewForm(reviewId) {
+        document.getElementById(`edit-form-${reviewId}`).style.display = 'block';
+    }
+
+    // 리뷰 수정 폼 숨기기
+    function hideEditReviewForm(reviewId) {
+        document.getElementById(`edit-form-${reviewId}`).style.display = 'none';
+    }
+
+    // 별점 선택 스타일링 (새 리뷰)
+    document.querySelectorAll('.rating-options input[type="radio"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const id = this.id;
+            const value = this.value;
+            const labels = document.querySelectorAll('.rating-options label');
+
+            labels.forEach(function(label) {
+                if (label.getAttribute('for') === id) {
+                    label.style.color = 'var(--hotpot-orange)';
+                } else {
+                    label.style.color = '#ccc';
+                }
+            });
+        });
+    });
+
+    // 앨범 삭제 확인
+    function confirmDeleteAlbum(albumId) {
+        if (confirm('정말로 이 앨범을 삭제하시겠습니까? 모든 곡과 리뷰가 함께 삭제됩니다.')) {
+            window.location.href = `/delete_album/${albumId}`;
+        }
+    }
+
+    // 노래 삭제 확인
+    function confirmDeleteSong(songId) {
+        if (confirm('정말로 이 노래를 삭제하시겠습니까?')) {
+            window.location.href = `/delete_song/${songId}`;
+        }
+    }
 </script>
 {% endblock %}

@@ -10,37 +10,41 @@ class PlaylistSong(db.Model):
     playlist_id = db.Column(db.Integer, db.ForeignKey('playlist.id'), primary_key=True)
     song_id = db.Column(db.Integer, db.ForeignKey('song.id'), primary_key=True)
     added_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # 관계 정의
+
     playlist = db.relationship("Playlist", back_populates="songs")
     song = db.relationship("Song", back_populates="playlists")
+
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
+    preferred_genres = db.Column(db.String(255))  # 선호 장르 (쉼표로 구분된 문자열)
+
     reviews = db.relationship('Review', backref='author', lazy='dynamic')
     playlists = db.relationship('Playlist', backref='user', lazy='dynamic')
 
     def __repr__(self):
         return f'<User {self.username}>'
 
+
 class Album(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     artist = db.Column(db.String(100), nullable=False)
     release_date = db.Column(db.Date)
-    genre = db.Column(db.String(50))
+    genre = db.Column(db.String(255))
     cover_image = db.Column(db.String(500))
-    youtube_url = db.Column(db.String(500))  # 앨범 유튜브 URL
+    youtube_url = db.Column(db.String(500))  # 유튜브 URL
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
     reviews = db.relationship('Review', backref='album', lazy='dynamic')
     songs = db.relationship('Song', backref='album', lazy='dynamic')
 
     def __repr__(self):
         return f'<Album {self.title} by {self.artist}>'
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -53,56 +57,50 @@ class Album(db.Model):
             'avg_rating': self.average_rating(),
             'song_count': self.songs.count()
         }
-    
+
     def average_rating(self):
         reviews = self.reviews.all()
         if not reviews:
             return 0
         return sum(review.rating for review in reviews) / len(reviews)
-    
-    # 앨범의 첫 번째 곡 유튜브 임베드 URL 가져오기 
+
+    @property
+    def youtube_embed_url(self):
+        if not self.youtube_url:
+            return None
+        if 'youtube.com/watch?v=' in self.youtube_url:
+            video_id = self.youtube_url.split('v=')[1].split('&')[0]
+            return f"https://www.youtube.com/embed/{video_id}"
+        elif 'youtube.com/playlist?list=' in self.youtube_url:
+            list_id = self.youtube_url.split('list=')[1].split('&')[0]
+            return f"https://www.youtube.com/embed/videoseries?list={list_id}"
+        elif 'youtu.be/' in self.youtube_url:
+            video_id = self.youtube_url.split('youtu.be/')[1].split('?')[0]
+            return f"https://www.youtube.com/embed/{video_id}"
+        return self.youtube_url
+
     @property
     def first_song_youtube_embed_url(self):
         first_song = self.songs.first()
         if first_song and first_song.youtube_url:
             return first_song.youtube_embed_url
         return None
-        
-    @property
-    def youtube_embed_url(self):
-        """유튜브 URL을 임베드 URL로 변환"""
-        if not self.youtube_url:
-            return None
-        
-        # 일반 동영상 URL 변환
-        if 'youtube.com/watch?v=' in self.youtube_url:
-            video_id = self.youtube_url.split('v=')[1].split('&')[0]
-            return f"https://www.youtube.com/embed/{video_id}"
-        
-        # 플레이리스트 URL 변환
-        elif 'youtube.com/playlist?list=' in self.youtube_url:
-            list_id = self.youtube_url.split('list=')[1].split('&')[0]
-            return f"https://www.youtube.com/embed/videoseries?list={list_id}"
-        
-        # 단축 URL 변환
-        elif 'youtu.be/' in self.youtube_url:
-            video_id = self.youtube_url.split('youtu.be/')[1].split('?')[0]
-            return f"https://www.youtube.com/embed/{video_id}"
-        
-        return self.youtube_url  # 형식이 맞지 않으면 원래 URL 반환
+
 
 class Song(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    duration = db.Column(db.String(10))  # 문자열 형식의 재생 시간 (예: "3:45")
+    title = db.Column(db.String(255), nullable=False)
+    duration = db.Column(db.String(10))  # 예: "3:45"
     track_number = db.Column(db.Integer)
-    youtube_url = db.Column(db.String(500))  # 유튜브 영상 URL
+    youtube_url = db.Column(db.String(500))  # 유튜브 URL
+    lastfm_url = db.Column(db.String(500))   # Last.fm URL
     album_id = db.Column(db.Integer, db.ForeignKey('album.id'), nullable=False)
+
     playlists = db.relationship('PlaylistSong', back_populates='song')
-    
+
     def __repr__(self):
         return f'<Song {self.title}>'
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -110,27 +108,24 @@ class Song(db.Model):
             'duration': self.duration,
             'track_number': self.track_number,
             'youtube_url': self.youtube_url,
+            'lastfm_url': self.lastfm_url,
             'album_id': self.album_id,
             'album_title': self.album.title,
             'artist': self.album.artist
         }
-    
+
     @property
     def youtube_embed_url(self):
-        """유튜브 URL을 임베드 URL로 변환"""
         if not self.youtube_url:
             return None
-        
-        # 유튜브 URL 형식: https://www.youtube.com/watch?v=VIDEO_ID
-        # 또는 https://youtu.be/VIDEO_ID
         if 'youtube.com/watch?v=' in self.youtube_url:
             video_id = self.youtube_url.split('v=')[1].split('&')[0]
         elif 'youtu.be/' in self.youtube_url:
             video_id = self.youtube_url.split('youtu.be/')[1].split('?')[0]
         else:
-            return self.youtube_url  # 형식이 맞지 않으면 원래 URL 반환
-        
+            return self.youtube_url
         return f"https://www.youtube.com/embed/{video_id}"
+
 
 class Playlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -141,11 +136,12 @@ class Playlist(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     is_public = db.Column(db.Boolean, default=True)
+
     songs = db.relationship('PlaylistSong', back_populates='playlist')
-    
+
     def __repr__(self):
         return f'<Playlist {self.name} by User {self.user_id}>'
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -160,9 +156,10 @@ class Playlist(db.Model):
             'song_count': len(self.songs)
         }
 
+
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    rating = db.Column(db.Integer, nullable=False)  # 0-3 stars
+    rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -172,7 +169,7 @@ class Review(db.Model):
 
     def __repr__(self):
         return f'<Review {self.id} by User {self.user_id} for Album {self.album_id}>'
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -184,4 +181,4 @@ class Review(db.Model):
             'username': self.author.username,
             'album_id': self.album_id,
             'is_public': self.is_public
-        } 
+        }

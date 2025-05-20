@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}{{ playlist_name }} - Hotpot Music{% endblock %}
+
+{% block content %}
+<div class="playlist-detail">
+  <h1 style="text-align: center; margin-bottom: 2rem;">{{ playlist_name }}</h1>  <!-- 🔧 제목 표시 -->
+
+  {% if songs %}
+  <div class="song-list">
+    {% for song in songs %}
+    <div class="song-item">
+      <div class="track-number">{{ loop.index }}</div>
+      <div class="song-info">
+        <strong>{{ song.title }}</strong><br>
+        <span>앨범: {{ song.album.title }}</span><br>
+        <span>아티스트: {{ song.album.artist }}</span>
+      </div>
+      <div class="song-meta">
+        {% if song.duration %}
+        <span>{{ song.duration }}</span>
+        {% endif %}
+        {% if song.lastfm_url %}
+        <a href="{{ song.lastfm_url }}" class="btn btn-small" target="_blank">곡 정보</a>
+        {% endif %}
+        <button class="btn btn-small btn-danger" onclick="addToPlaylist({{ song.id }})">+</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p>추천할 곡이 없습니다.</p>
+  {% endif %}
+</div>
+
+<script>
+  const playlistId = {{ current_user.playlists.first().id if current_user.playlists.first() else 'null' }};
+
+  function addToPlaylist(songId) {
+    if (playlistId === null) {
+      alert('먼저 플레이리스트를 생성해주세요!');
+      return;
+    }
+
+    fetch(`/add_song_to_playlist/${playlistId}/${songId}`, {
+      method: 'POST'
+    })
+    .then(res => res.json())
+    .then(data => alert(data.message))
+    .catch(err => console.error(err));
+  }
+</script>
+
+<style>
+.playlist-detail {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.song-list {
+  margin-top: 2rem;
+}
+
+.song-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.track-number {
+  font-weight: bold;
+  font-size: 1.2rem;
+  width: 30px;
+}
+
+.song-info {
+  flex-grow: 1;
+  padding: 0 1rem;
+}
+
+.song-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+</style>
+{% endblock %}

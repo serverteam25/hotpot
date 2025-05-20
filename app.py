@@ -1,20 +1,23 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Album, Review, Song, Playlist, PlaylistSong
 from config import Config
 from datetime import datetime
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from lastfm import get_chart_recommended_albums, get_album_info
 import re
 import requests
 import json
 from pytube import YouTube, Playlist as PytubePlaylist
 import urllib.parse
+import random
+import math
 
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
 
 # 데이터베이스 초기화
 db.init_app(app)
@@ -28,10 +31,13 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# 데이터베이스 생성
-@app.before_first_request
-def create_tables():
+# 데이터베이스 초기화 함수
+def init_db():
     db.create_all()
+
+# Flask 2.3.x에서는 before_first_request 대신 with app.app_context() 사용
+with app.app_context():
+    init_db()
 
 # 홈 페이지
 @app.route('/')
@@ -43,34 +49,35 @@ def index():
 # 회원가입
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    tags_list = ['pop', 'rock', 'jazz', 'hiphop', 'kpop', 'electronic', 'indie', 'punk']
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
-        
-        user = User.query.filter_by(username=username).first()
-        if user:
+        selected_tags = request.form.getlist('preferred_genres')
+        preferred_genres = ','.join(selected_tags) if selected_tags else ""
+
+        if User.query.filter_by(username=username).first():
             flash('Username already exists.')
             return redirect(url_for('register'))
-        
-        user = User.query.filter_by(email=email).first()
-        if user:
+        if User.query.filter_by(email=email).first():
             flash('Email already exists.')
             return redirect(url_for('register'))
-        
+
         new_user = User(
             username=username,
             email=email,
-            password_hash=generate_password_hash(password)
+            password_hash=generate_password_hash(password),
+            preferred_genres=preferred_genres
         )
-        
         db.session.add(new_user)
         db.session.commit()
-        
+
         flash('Registration successful! Please log in.')
         return redirect(url_for('login'))
-    
-    return render_template('register.html')
+
+    return render_template('register.html', tags_list=tags_list)
+
 
 # 로그인
 @app.route('/login', methods=['GET', 'POST'])
@@ -181,71 +188,97 @@ def add_album():
     if request.method == 'POST':
         title = request.form.get('title')
         artist = request.form.get('artist')
-        release_date_str = request.form.get('release_date')
-        youtube_url = request.form.get('youtube_url')
-        cover_image = request.form.get('cover_image')
-        
-        # 장르 처리 (체크박스 및 커스텀 장르)
-        genre_values = request.form.getlist('genre')
-        custom_genre = request.form.get('custom_genre')
-        
-        if custom_genre:
-            genre_values.append(custom_genre)
-        
-        # 장르 배열을 쉼표로 구분된 문자열로 변환
-        genre = ", ".join(genre_values) if genre_values else None
         
         if not title or not artist:
-            flash('제목과 아티스트는 필수 입력 항목입니다.', 'danger')
+            flash('앨범 제목과 아티스트 이름을 모두 입력해주세요.', 'danger')
             return redirect(url_for('add_album'))
         
-        release_date = None
-        if release_date_str:
-            try:
-                release_date = datetime.strptime(release_date_str, '%Y-%m-%d').date()
-            except ValueError:
-                flash('날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식으로 입력해주세요.', 'danger')
-                return redirect(url_for('add_album'))
+        # Last.fm API로 앨범 검색
+        album_info = get_album_info(album_title=title, artist_name=artist)
         
-        new_album = Album(
-            title=title,
-            artist=artist,
-            release_date=release_date,
-            genre=genre,
-            cover_image=cover_image,
-            youtube_url=youtube_url
+        if not album_info:
+            flash(f'"{title}" 앨범을 찾을 수 없습니다. 앨범 제목과 아티스트 이름을 확인해주세요.', 'danger')
+            return redirect(url_for('add_album'))
+        
+        # 이미 데이터베이스에 있는지 확인
+        existing_album = Album.query.filter_by(
+            title=album_info['title'],
+            artist=album_info['artist']
+        ).first()
+        
+        if existing_album:
+            flash(f'"{title}" 앨범이 이미 데이터베이스에 있습니다.', 'warning')
+            return redirect(url_for('album_detail', album_id=existing_album.id))
+        
+        # 새 앨범 생성
+        album = Album(
+            title=album_info['title'],
+            artist=album_info['artist'],
+            genre=', '.join(album_info['tags']),
+            cover_image=album_info['cover_image'],
+            release_date=datetime.now().date()  # Last.fm에서 발매일 정보를 제공하지 않으므로 현재 날짜로 설정
         )
+        db.session.add(album)
+        db.session.flush()
         
-        db.session.add(new_album)
+        # 수록곡 추가
+        for idx, track in enumerate(album_info['tracks'], 1):
+            song = Song(
+                title=track['title'],
+                duration=track['duration'],
+                track_number=idx,
+                album_id=album.id,
+                lastfm_url=track.get('url')
+            )
+            db.session.add(song)
+        
         db.session.commit()
-        
-        flash('앨범이 성공적으로 추가되었습니다!', 'success')
-        
-        # 유튜브 링크가 있다면 자동으로 곡 추가
-        if youtube_url and 'youtube.com' in youtube_url:
-            try:
-                # 유튜브 플레이리스트에서 곡 정보 가져오기
-                songs_info = fetch_songs_from_youtube(youtube_url)
-                
-                # 각 곡 정보로 노래 생성
-                for song_info in songs_info:
-                    song = Song(
-                        title=song_info.get('title', ''),
-                        track_number=song_info.get('track_number'),
-                        duration=song_info.get('duration'),
-                        youtube_url=song_info.get('youtube_url'),
-                        album_id=new_album.id
-                    )
-                    db.session.add(song)
-                
-                db.session.commit()
-                flash(f'{len(songs_info)}개의 노래가 앨범에 자동으로 추가되었습니다!', 'success')
-            except Exception as e:
-                flash(f'노래를 자동으로 추가하는 중 오류가 발생했습니다: {str(e)}', 'warning')
-        
-        return redirect(url_for('album_detail', album_id=new_album.id))
+        flash(f'"{title}" 앨범이 성공적으로 추가되었습니다!', 'success')
+        return redirect(url_for('album_detail', album_id=album.id))
     
-    return render_template('add_album.html', genres=GENRES)
+    return render_template('add_album.html')
+
+
+# 선호장르기반플레이리스트
+@app.route('/recommendations')
+@login_required
+def recommendations():
+    genres = current_user.preferred_genres
+
+    if genres == 'unknown' or not genres:
+        songs = Song.query.order_by(db.func.rand()).limit(10).all()
+        playlist_name = "랜덤 추천 플레이리스트"
+    else:
+        def normalize(text):
+            return re.sub(r'[^a-zA-Z0-9]', '', text.lower())
+
+        genre_list = [normalize(g.strip()) for g in genres.split(',')]
+
+        matching_albums = Album.query.filter(
+            or_(
+                *[db.func.replace(db.func.lower(Album.genre), '-', '').ilike(f"%{genre}%") for genre in genre_list],
+                *[db.func.replace(db.func.lower(Album.genre), ' ', '').ilike(f"%{genre}%") for genre in genre_list],
+            )
+        ).all()
+
+        album_ids = [album.id for album in matching_albums]
+        songs = Song.query.filter(Song.album_id.in_(album_ids)).order_by(db.func.rand()).limit(10).all()
+
+        playlist_name = f"{current_user.preferred_genres} 추천 플레이리스트"
+
+    playlist_cover = "/static/images/default_playlist.jpg"
+    created_date = datetime.utcnow().strftime("%Y년 %m월 %d일")
+
+    return render_template(
+        'recommendations.html',
+        songs=songs,
+        playlist_name=playlist_name,
+        playlist_cover=playlist_cover,
+        created_date=created_date
+    )
+
+
+
 
 # 앨범 수정
 @app.route('/edit_album/<int:album_id>', methods=['GET', 'POST'])
@@ -320,6 +353,7 @@ def delete_album(album_id):
 
 # 노래 추가
 @app.route('/add_song/<int:album_id>', methods=['GET', 'POST'])
+@login_required
 def add_song(album_id):
     album = Album.query.get_or_404(album_id)
     
@@ -327,33 +361,21 @@ def add_song(album_id):
         title = request.form.get('title')
         track_number = request.form.get('track_number')
         duration = request.form.get('duration')
-        youtube_url = request.form.get('youtube_url')
+        url = request.form.get('url')
         
-        # 필수 입력값 검증
         if not title:
             flash('노래 제목을 입력해주세요.', 'danger')
             return redirect(url_for('add_song', album_id=album_id))
         
-        # 트랙 번호 숫자 변환
-        track_num = None
-        if track_number:
-            try:
-                track_num = int(track_number)
-            except ValueError:
-                flash('트랙 번호는 숫자여야 합니다.', 'danger')
-                return redirect(url_for('add_song', album_id=album_id))
-        
-        # 새 노래 객체 생성
-        new_song = Song(
+        song = Song(
             title=title,
-            track_number=track_num,
-            duration=duration if duration else None,
-            youtube_url=youtube_url if youtube_url else None,
-            album_id=album_id
+            track_number=track_number,
+            duration=duration,
+            album_id=album_id,
+            lastfm_url = url
         )
         
-        # 데이터베이스에 추가
-        db.session.add(new_song)
+        db.session.add(song)
         db.session.commit()
         
         flash('노래가 추가되었습니다!', 'success')
@@ -865,6 +887,140 @@ def delete_review(review_id):
     
     flash('리뷰가 삭제되었습니다.', 'success')
     return redirect(url_for('album_detail', album_id=album_id))
+
+
+
+@app.route('/worldcup', methods=['GET', 'POST'])
+def worldcup():
+    if request.method == 'POST':
+        genre = request.form.get('genre')
+        round_size = int(request.form.get('round_size', 16))
+        
+        # 장르별 앨범 필터링 (대소문자 구분 없이)
+        if genre == 'hiphop':
+            albums = Album.query.filter(
+                or_(
+                    Album.genre.ilike('%hip%'),
+                    Album.genre.ilike('%rap%'),
+                    Album.genre.ilike('%힙합%')
+                )
+            ).distinct().all()
+        elif genre == 'kpop':
+            albums = Album.query.filter(
+                or_(
+                    Album.genre.ilike('%k-pop%'),
+                    Album.genre.ilike('%kpop%'),
+                    Album.genre.ilike('%케이팝%')
+                )
+            ).distinct().all()
+        else:
+            albums = []
+
+        if len(albums) < round_size:
+            flash(f'선택한 장르의 앨범이 {round_size}개보다 적습니다. 더 많은 앨범을 추가해주세요.', 'warning')
+            return redirect(url_for('worldcup'))
+        
+        # 중복 제거 후 랜덤 선택
+        unique_albums = list(set(albums))  # 중복 제거
+        random.shuffle(unique_albums)  # 랜덤하게 섞기
+        selected_albums = unique_albums[:round_size]  # 필요한 만큼만 선택
+        
+        # 세션에 게임 정보 저장
+        session['worldcup'] = {
+            'genre': genre,
+            'round_size': round_size,
+            'albums': [album.id for album in selected_albums],
+            'current_round': 1,
+            'winners': [],
+            'current_match': 0
+        }
+        
+        return redirect(url_for('worldcup_round'))
+    
+    return render_template('worldcup.html')
+
+@app.route('/worldcup/round', methods=['GET', 'POST'])
+def worldcup_round():
+    if 'worldcup' not in session:
+        return redirect(url_for('worldcup'))
+    
+    game = session['worldcup']
+    current_albums = game['albums']
+    current_round = game['current_round']
+    
+    if request.method == 'POST':
+        winner_id = request.form.get('winner')
+        game['winners'].append(int(winner_id))
+        
+        # 현재 라운드의 모든 매치가 완료되었는지 확인
+        if len(game['winners']) == len(current_albums) // 2:
+            # 결승전이 끝났는지 확인
+            if len(current_albums) == 2:
+                winner = Album.query.get(game['winners'][0])
+                session.pop('worldcup', None)
+                return render_template('worldcup_winner.html', winner=winner)
+            
+            # 다음 라운드 준비
+            game['albums'] = game['winners']
+            game['winners'] = []
+            game['current_round'] += 1
+            game['current_match'] = 0
+            session['worldcup'] = game
+            return redirect(url_for('worldcup_round'))
+        
+        # 다음 매치로 이동
+        if 'current_match' not in game:
+            game['current_match'] = 0
+        game['current_match'] += 1
+        session['worldcup'] = game
+    
+    # 현재 매치의 두 앨범 선택
+    if 'current_match' not in game:
+        game['current_match'] = 0
+        session['worldcup'] = game
+    
+    match_index = game['current_match'] * 2
+    
+    # 매치 인덱스가 유효한지 확인
+    if match_index >= len(current_albums) or match_index + 1 >= len(current_albums):
+        # 현재 라운드의 모든 매치가 완료된 경우
+        if len(game['winners']) > 0:
+            # 다음 라운드로 진행
+            game['albums'] = game['winners']
+            game['winners'] = []
+            game['current_round'] += 1
+            game['current_match'] = 0
+            session['worldcup'] = game
+            return redirect(url_for('worldcup_round'))
+        else:
+            # 비정상적인 상태이므로 처음부터 다시 시작
+            return redirect(url_for('worldcup'))
+    
+    album1 = Album.query.get(current_albums[match_index])
+    album2 = Album.query.get(current_albums[match_index + 1])
+    
+    total_rounds = math.ceil(math.log2(game['round_size']))
+    matches_in_round = len(current_albums) // 2
+    current_match = game['current_match'] + 1
+    
+    return render_template('worldcup_round.html',
+                         album1=album1,
+                         album2=album2,
+                         current_round=current_round,
+                         total_rounds=total_rounds,
+                         current_match=current_match,
+                         matches_in_round=matches_in_round)
+
+@app.route('/worldcup/winner')
+def worldcup_winner():
+    if 'worldcup' not in session:
+        return redirect(url_for('worldcup'))
+    
+    game = session['worldcup']
+    winner = Album.query.get(game['winners'][0])
+    session.pop('worldcup', None)
+    
+    return render_template('worldcup_winner.html', winner=winner)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5002) 
