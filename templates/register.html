@@ -21,6 +21,23 @@
             <label for="password">비밀번호</label>
             <input type="password" id="password" name="password" required>
         </div>
+
+        <!-- ✅ 선호 장르 체크박스 -->
+        <div class="form-group">
+            <label>선호 장르를 선택해주세요</label><br>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <label><input type="checkbox" name="preferred_genres" value="pop"> Pop</label>
+                <label><input type="checkbox" name="preferred_genres" value="Hip-Hop"> Hip-Hop</label>
+                <label><input type="checkbox" name="preferred_genres" value="kpop"> K-Pop</label>
+                <label><input type="checkbox" name="preferred_genres" value="rock"> Rock</label>
+                <label><input type="checkbox" name="preferred_genres" value="electronic"> Electronic</label>
+                <label><input type="checkbox" name="preferred_genres" value="indie"> Indie</label>
+                <label><input type="checkbox" name="preferred_genres" value="jazz"> Jazz</label>
+                <label><input type="checkbox" name="preferred_genres" value="punk"> Punk</label>
+                <!-- ✅ 잘 모르겠어요 옵션 -->
+                <label><input type="checkbox" name="preferred_genres" value="unknown"> 잘 모르겠어요</label>
+            </div>
+        </div>
         
         <div class="form-actions">
             <button type="submit" class="btn">회원가입</button>
@@ -31,4 +48,5 @@
         <p>이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인</a></p>
     </div>
 </section>
-{% endblock %} 
+{% endblock %}
+
