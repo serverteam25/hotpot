@@ -17,7 +17,9 @@ import math
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
+app.config['SECRET_KEY'] = 'hotpot-secret-key-2024'  # 세션을 위한 시크릿 키 설정
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:hotpot123@localhost/hotpot'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 데이터베이스 초기화
 db.init_app(app)
@@ -226,8 +228,7 @@ def add_album():
                 title=track['title'],
                 duration=track['duration'],
                 track_number=idx,
-                album_id=album.id,
-                lastfm_url=track.get('url')
+                album_id=album.id
             )
             db.session.add(song)
         
@@ -318,7 +319,6 @@ def add_song(album_id):
         title = request.form.get('title')
         track_number = request.form.get('track_number')
         duration = request.form.get('duration')
-        url = request.form.get('url')
         
         if not title:
             flash('노래 제목을 입력해주세요.', 'danger')
@@ -328,8 +328,7 @@ def add_song(album_id):
             title=title,
             track_number=track_number,
             duration=duration,
-            album_id=album_id,
-            lastfm_url = url
+            album_id=album_id
         )
         
         db.session.add(song)
